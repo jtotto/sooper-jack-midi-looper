@@ -5,6 +5,9 @@
 #include <string.h>
 
 #include <jack/midiport.h>
+#include <jack/ringbuffer.h>
+
+static void midi_message_from_midi_event( struct MidiMessage *message, jack_midi_event_t event );
 
 int midi_message_from_port_buffer(
         struct MidiMessage *message,
@@ -14,7 +17,7 @@ int midi_message_from_port_buffer(
 
     jack_midi_event_t event;
 
-    int read = jack_midi_event_get( &event, port_buffer, i );
+    int read = jack_midi_event_get( &event, port_buffer, event_index );
     if( read )
     {
         fprintf( stderr, "Control JACK MIDI event get failed.\n" );

@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 typedef struct loop_buffer_type *LoopBuffer;
 
 LoopBuffer loop_buffer_init( unsigned int capacity );
+
+// Hides the implementation of LoopBuffer as a struct pointer.
 int loop_buffer_is_valid( LoopBuffer buffer );
 
 void loop_buffer_reset_read( LoopBuffer buffer );
@@ -30,7 +32,7 @@ void loop_buffer_reset_write( LoopBuffer buffer );
 void loop_buffer_free( LoopBuffer buffer );
 
 int loop_buffer_push( LoopBuffer buffer, struct MidiMessage *message );
-struct MidiMessage *loop_buffer_peek( LoopBuffer buffer );
-int loop_buffer_read_advance( LoopBuffer buffer );
+struct MidiMessage *loop_buffer_peek( LoopBuffer buffer, int *wrapped );
+void loop_buffer_read_advance( LoopBuffer buffer );
 
 #endif

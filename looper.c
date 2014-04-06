@@ -49,9 +49,8 @@ int sample_rate_change( jack_nframes_t nframes, void *notUsed )
 
 void process_midi_input( jack_nframes_t nframes )
 {
-    int read, events;
+    int events;
     void *control_port_buffer;
-    jack_midi_event_t event;
 
     control_port_buffer = jack_port_get_buffer( control_input, nframes );
     if ( control_port_buffer == NULL)
@@ -65,27 +64,14 @@ void process_midi_input( jack_nframes_t nframes )
     int i;
     for ( i = 0; i < events; i++ )
     {
-        struct MidiMessage *rev;
+        struct MidiMessage rev;
 
-        if( ( read = jack_midi_event_get( &event, control_port_buffer, i ) ) )
+        if( midi_message_from_port_buffer( &rev, control_port_buffer, i ) != 0 )
         {
-            fprintf( stderr, "Control JACK MIDI event get failed.\n" );
-            continue;
+            fprintf( stderr, "TROUBLE\n" );
         }
 
-        if ( event.size > 3 )
-        {
-            fprintf( stderr, "Ignoring MIDI message longer than three bytes, probably a SysEx.\n" );
-            continue;
-        }
-
-        if ( ( rev = midi_message_from_midi_event( event ) ) == NULL )
-        {
-            fprintf( stderr, "midi_message_from_midi_event failed, RECEIVED NOTE LOST.\n" );
-            continue;
-        }
-
-        printf( "%d - %d\n", nframes, rev->time );
+        printf( "%d - %d\n", nframes, rev.time );
         jack_nframes_t last_frame_time = jack_last_frame_time( jack_client );
         printf( "LAST %d\n", last_frame_time );
 
@@ -96,7 +82,6 @@ void process_midi_input( jack_nframes_t nframes )
 int process( jack_nframes_t frames, void *notUsed )
 {
     process_midi_input( frames );
-    // process_midi_output( frames );
 
     return 0;
 }

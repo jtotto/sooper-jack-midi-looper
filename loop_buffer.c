@@ -5,10 +5,10 @@
 #include <stdlib.h>
 
 struct loop_buffer_type {
-    struct MidiMessage *buffer,
-    struct MidiMessage *read_pointer,
-    struct MidiMessage *write_pointer,
-    struct MidiMessage *end_pointer
+    struct MidiMessage *buffer;
+    struct MidiMessage *read_pointer;
+    struct MidiMessage *write_pointer;
+    struct MidiMessage *end_pointer;
 };
 
 struct loop_buffer_type *loop_buffer_init( size_t capacity )
@@ -82,20 +82,26 @@ int loop_buffer_push( struct loop_buffer_type *loop_buffer, struct MidiMessage *
     return 0;
 }
 
-struct MidiMessage *loop_buffer_peek( struct loop_buffer_type *loop_buffer )
+struct MidiMessage *loop_buffer_peek( struct loop_buffer_type *loop_buffer, int *wrapped )
 {
+    if( loop_buffer->read_pointer == loop_buffer->end_pointer )
+    {
+        loop_buffer->read_pointer = loop_buffer->buffer;
+        *wrapped = 1;
+    }
+    else
+    {
+        *wrapped = 0;
+    }
+
     return loop_buffer->read_pointer;
 }
 
-int loop_buffer_read_advance( struct loop_buffer_type *loop_buffer )
+void loop_buffer_read_advance( struct loop_buffer_type *loop_buffer )
 {
-    loop_buffer->read_pointer++;
-
-    if( loop_buffer->read_pointer == end_pointer )
+    if( loop_buffer->read_pointer != NULL )
     {
-        return -10;
+        loop_buffer->read_pointer++;
     }
-
-    return 0;
 }
 

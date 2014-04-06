@@ -2,6 +2,7 @@
 #define MIDI_MESSAGE_H
 
 #include <jack/midiport.h>
+#include <jack/ringbuffer.h>
 
 // The only difference between this struct and jack_midi_event_t is that
 // the raw data storage is actually contained within the struct
@@ -16,6 +17,11 @@ int midi_message_from_port_buffer(
     struct MidiMessage *message,
     void *port_buffer,
     int event_index
+);
+
+int queue_midi_message(
+    jack_ringbuffer_t *ringbuffer,
+    struct MidiMessage *ev
 );
 
 #endif

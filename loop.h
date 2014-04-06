@@ -47,6 +47,6 @@ void loop_schedule_state_change(
 void loop_set_midi_through( Loop this, int set );
 void loop_set_playback_after_recording( Loop this, int set );
 
-int loop_process_callback( jack_nframes_t nframes );
+int loop_process_callback( Loop this, jack_nframes_t nframes );
 
 #endif
