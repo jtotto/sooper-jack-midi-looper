@@ -1,19 +1,23 @@
 --- IN PROGRESS - looping engine finished, UI under construction ---
 
-I really love the creative possibilities that loopers offer.  Apparently a lot of
-other people do too, because there are a ton of great open-source loopers.  However,
-all of them are sample-based, and I've encountered a number of situations in the past
-where this has held me back from getting the sounds that I wanted.
+I really love the creative possibilities that loopers offer.  Apparently a
+lot of other people do too, because there are a ton of great open-source 
+loopers.  However, all of them are sample-based, and I've encountered a 
+number of situations in the past where this has held me back from getting
+the sounds that I wanted.
 
-This looper is for MIDI data instead of samples, and aims to solve some of the problems
-inherent in using sampling loopers.  When I set out to create it, my primary use case
-was in looping pad synths with long sustains.  By looping the MIDI data and feeding it
-back into the synthesis engine, I can get loops with smooth boundaries that would be
-difficult if not impossible to achieve with sampling loopers.
+This looper is for MIDI data instead of samples, and aims to solve some of
+the problems inherent in using sampling loopers.  When I set out to create
+it, my primary use case was in looping pad synths with long sustains.  By
+looping the MIDI data and feeding it into my synthesis engine of choice as
+if it were a continuous stream of normal MIDI data, I can get loops with
+smooth boundaries that would be difficult if not impossible to achieve with
+sampling loopers.
 
-This method of looping obviously also requires a significantly smaller memory footprint
-for its buffers, so in computing environments where processing time is relatively abundant
-in comparison to memory, it may enable looping where it would otherwise be impossible.
+This method of looping obviously also requires a significantly smaller memory
+footprint for its buffers, so in computing environments where processing time
+is relatively abundant in comparison to memory, it may enable looping where it
+would otherwise be impossible.
 
 --- Building ---
 This project depends on JACK for MIDI, GTK for UI and Glib for some data structures.
