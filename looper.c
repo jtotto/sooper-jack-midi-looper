@@ -15,20 +15,26 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. */
 
-// Some of the JACK MIDI plumbing here comes from jack-keyboard-2.5
-// by Edward Tomasz Napierała, FreeBSD license, jack-keyboard.sourceforge.net
+/* Some of the JACK MIDI plumbing here comes from jack-keyboard-2.5
+   by Edward Tomasz Napierała, FreeBSD license, jack-keyboard.sourceforge.net */
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include <jack/jack.h>
 #include <jack/midiport.h>
 #include <jack/ringbuffer.h>
 
+#include <gtk/gtk.h>
+
 #include "midi_message.h"
+
+#define NOTE_OFF 0x80
+#define NOTE_ON 0x90
+#define CONTROL_CHANGE 0xB0
 
 jack_client_t *jack_client;
 jack_port_t *control_input;
@@ -38,23 +44,22 @@ int rateFlag = 0;
 
 int sample_rate_change( jack_nframes_t nframes, void *notUsed )
 {
-    if( !rateFlag )
-    {
+    if( !rateFlag ) {
         rateFlag = 1;
         return 0;
     }
+
     printf( "Sample rate has changed! Exiting...\n" );
     exit( -1 );
 }
 
-void process_midi_input( jack_nframes_t nframes )
+void process_control_input( jack_nframes_t nframes )
 {
     int events;
     void *control_port_buffer;
 
     control_port_buffer = jack_port_get_buffer( control_input, nframes );
-    if ( control_port_buffer == NULL)
-    {
+    if ( control_port_buffer == NULL) {
         fprintf( stderr, "Failed to get control input port buffer.\n" );
         return;
     }
@@ -62,18 +67,12 @@ void process_midi_input( jack_nframes_t nframes )
     events = jack_midi_get_event_count( control_port_buffer );
 
     int i;
-    for ( i = 0; i < events; i++ )
-    {
+    for ( i = 0; i < events; i++ ) {
         struct MidiMessage rev;
 
-        if( midi_message_from_port_buffer( &rev, control_port_buffer, i ) != 0 )
-        {
+        if( midi_message_from_port_buffer( &rev, control_port_buffer, i ) != 0 ) {
             fprintf( stderr, "TROUBLE\n" );
         }
-
-        printf( "%d - %d\n", nframes, rev.time );
-        jack_nframes_t last_frame_time = jack_last_frame_time( jack_client );
-        printf( "LAST %d\n", last_frame_time );
 
     }
 
@@ -81,16 +80,15 @@ void process_midi_input( jack_nframes_t nframes )
 
 int process( jack_nframes_t frames, void *notUsed )
 {
-    process_midi_input( frames );
-
+    process_control_input( frames );
     return 0;
 }
 
-void init_jack( void ) {
+void init_jack( void )
+{
 
     jack_client = jack_client_open ( "midi_looper", JackNullOption, NULL );
-    if( jack_client == 0 )
-    {
+    if( jack_client == 0 ) {
         fprintf ( stderr, "jack server not running?\n" );
         exit( -1 );
     }
@@ -109,28 +107,72 @@ void init_jack( void ) {
         0
     );
 
-    if( control_input == NULL )
-    {
+    if( control_input == NULL ) {
         fprintf( stderr, "Could not register JACK control input port.\n" );
         exit( -1 );
     }
 
-    if( jack_activate( jack_client ) )
-    {
+    if( jack_activate( jack_client ) ) {
         fprintf( stderr, "Could not activate JACK.\n" );
         exit( -1 );
     }
 
 }
+
+void close_jack( void ) 
+{
+    jack_client_close( jack_client );
+}
+
+gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
+{
+    gtk_main_quit();
+    return FALSE;
+}
+
+void init_gui()
+{
+
+    GtkWidget *window;
+    GtkWidget *label;
+
+    window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+
+    gtk_window_set_title (GTK_WINDOW(window), "MIDI Looper");
+
+    g_signal_connect(window, "delete-event", G_CALLBACK(delete_event), NULL);
+    gtk_container_set_border_width(GTK_CONTAINER(window), 10); // Pretty self-explanatory - sets the border width of 'window.'
+
+    GtkWidget *notebook = gtk_notebook_new();
+    gtk_container_add(GTK_CONTAINER(window), notebook ); 
+
+    label = gtk_label_new( "Loops" );
+    gtk_widget_show( label );
+
+    GtkGrid *grid = gtk_grid_new();
+    gtk_grid_set_row_spacing( grid, 5 );
+    gtk_notebook_append_page( (GtkNotebook *)notebook, grid, label );
+
+    label = gtk_label_new( "MIDI Mappings" );
+    gtk_widget_show( label );
+    gtk_notebook_append_page( (GtkNotebook *)notebook, /*grid*/, label );
+ 
+    gtk_widget_show( notebook );
+    gtk_widget_show( window );
+}
+
 int main(int argc, char *argv[])
 {
-    // Command line options.
-
     // Fire up JACK.
     init_jack();
 
-    // Sleep in the main thread (all the interesting stuff is happening in the RT JACK thread).
-    sleep( -1 );
+    // GTK next.
+    gtk_init(&argc, &argv);
+    init_gui();
+    gtk_main();
+
+    // At this point, the program has been terminated.
+    close_jack();
 
     return 0;
 }

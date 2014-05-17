@@ -32,17 +32,8 @@ int loop_init(
 
 void loop_free( Loop this );
 
-typedef enum {
-    STATE_RECORDING,
-    STATE_PLAYBACK,
-    STATE_IDLE
-} LoopState;
-
-void loop_schedule_state_change(
-    Loop this,
-    LoopState state,
-    jack_nframes_t time
-);
+void loop_toggle_playback( Loop this, jack_nframes_t time );
+void loop_toggle_recording( Loop this, jack_nframes_t time );
 
 void loop_set_midi_through( Loop this, int set );
 void loop_set_playback_after_recording( Loop this, int set );

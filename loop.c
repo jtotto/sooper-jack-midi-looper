@@ -30,6 +30,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 #define MIDI_IO_BUFFER_SIZE     1024*sizeof( struct MidiMessage )
 #define MIDI_LOOP_BUFFER_SIZE   2048*sizeof( struct MidiMessage )
 
+typedef enum {
+    STATE_RECORDING,
+    STATE_PLAYBACK,
+    STATE_IDLE
+} LoopState;
+
 struct StateSchedule {
     LoopState state;
     jack_nframes_t time;
@@ -66,6 +72,12 @@ struct loop_type {
     LoopBuffer midi_loop_buffer;
 };
 
+static void schedule_state_change(
+    Loop this,
+    LoopState state,
+    jack_nframes_t time
+);
+
 static int process_state_midi_input(
     Loop this,
     void *input_port_buffer,
@@ -74,11 +86,13 @@ static int process_state_midi_input(
     jack_nframes_t end_of_state,
     jack_nframes_t last_frame_time
 );
+
 static int process_state_midi_playback(
     Loop this,
     jack_nframes_t end_of_state,
     jack_nframes_t last_frame_time
 );
+
 static int process_midi_output( Loop this, jack_nframes_t nframes, jack_nframes_t last_frame_time );
 
 int loop_init(
@@ -90,10 +104,8 @@ int loop_init(
     ) {
 
     // Main loop buffer.
-    LoopBuffer midi_loop_buffer = loop_buffer_init( MIDI_LOOP_BUFFER_SIZE );
-
-    if( !loop_buffer_is_valid( midi_loop_buffer ) )
-    {
+    LoopBuffer midi_loop_buffer = loop_buffer_init( MIDI_LOOP_BUFFER_SIZE ); 
+    if( !loop_buffer_is_valid( midi_loop_buffer ) ) {
         fprintf( stderr, "Cannot create loop buffer for %s.\n", name );
         return -1;
     }
@@ -101,8 +113,7 @@ int loop_init(
     // I/O ringbuffer.
     jack_ringbuffer_t *midi_io_buffer = jack_ringbuffer_create( MIDI_IO_BUFFER_SIZE );
 
-    if ( midi_io_buffer == NULL)
-    {
+    if ( midi_io_buffer == NULL) {
         fprintf( stderr, "Cannot create JACK MIDI ringbuffer for %s.\n", name );
         return -10;
     }
@@ -112,8 +123,7 @@ int loop_init(
     // State change ringbuffer.
     jack_ringbuffer_t *state_buffer = jack_ringbuffer_create( STATE_BUFFER_SIZE );
 
-    if( state_buffer == NULL )
-    {
+    if( state_buffer == NULL ) {
         fprintf( stderr, "Cannot create state change ringbuffer for %s.\n", name );
         return -11;
     }
@@ -124,8 +134,7 @@ int loop_init(
     size_t length_of_name = strlen( name );
 
     char *loop_output_name = malloc( length_of_name + 12 );
-    if( sprintf( loop_output_name, "loop_%s_output", name ) < 0 )
-    {
+    if( sprintf( loop_output_name, "loop_%s_output", name ) < 0 ) {
         fprintf( stderr, "Error building output port name string for %s.\n", name );
         return -20;
     }
@@ -138,15 +147,13 @@ int loop_init(
         0
     );
 
-    if( loop_output == NULL )
-    {
+    if( loop_output == NULL ) {
         fprintf( stderr, "Could not register JACK output port for %s.\n", name );
         return -30;
     }
 
     char *loop_input_name = malloc( length_of_name + 11 );
-    if( sprintf( loop_input_name, "loop_%s_input", name ) < 0 )
-    {
+    if( sprintf( loop_input_name, "loop_%s_input", name ) < 0 ) {
         fprintf( stderr, "Error building input port name string for %s.\n", name );
         return -40;
     }
@@ -159,8 +166,7 @@ int loop_init(
         0
     );
 
-    if( loop_input == NULL )
-    {
+    if( loop_input == NULL ) {
         fprintf( stderr, "Could not register JACK loop input port for %s.\n.", name );
         return -50;
     }
@@ -206,8 +212,26 @@ void loop_set_playback_after_recording( Loop this, int set )
     this->playback_after_recording = set;
 }
 
-// Will be invoked from the process callback (ie. it must be RT)
-void loop_schedule_state_change(
+void loop_toggle_playback( Loop this, jack_nframes_t time )
+{
+    if( this->current_state.state == STATE_PLAYBACK ) {
+        schedule_state_change( this, STATE_IDLE, time );
+    } else {
+        schedule_state_change( this, STATE_PLAYBACK, time );
+    }
+}
+
+void loop_toggle_recording( Loop this, jack_nframes_t time )
+{
+    if( this->current_state.state == STATE_RECORDING ) {
+        schedule_state_change( this, STATE_PLAYBACK, time );
+    } else {
+        schedule_state_change( this, STATE_RECORDING, time );
+    }
+}
+
+// May be invoked from the process callback (ie. it must be RT)
+static void schedule_state_change(
         Loop this,
         LoopState state,
         jack_nframes_t time
@@ -218,16 +242,14 @@ void loop_schedule_state_change(
         .time = time
     };
 
-    if( jack_ringbuffer_write_space( this->state_buffer ) < sizeof( change ) )
-    {
+    if( jack_ringbuffer_write_space( this->state_buffer ) < sizeof( change ) ) {
         fprintf( stderr, "Not enough space in the %s state buffer, CHANGE LOST.\n", this->name );
         return;
     }
 
     size_t written = jack_ringbuffer_write( this->state_buffer, (char *) &change, sizeof( change ) );
 
-    if( written != sizeof( change ) )
-    {
+    if( written != sizeof( change ) ) {
         fprintf( stderr, "jack_ringubffer_write failed for the %s state buffer, CHANGE LOST.\n", this->name );
     }
 }
@@ -238,8 +260,7 @@ int loop_process_callback( Loop this, jack_nframes_t nframes )
     struct StateSchedule previous_state = this->current_state;
 
     void *input_port_buffer = jack_port_get_buffer( this->loop_input, nframes );
-    if ( input_port_buffer == NULL )
-    {
+    if ( input_port_buffer == NULL ) {
         fprintf( stderr, "jack_port_get_buffer failed for %s, cannot receive anything.\n", this->name );
         return -10;
     }
@@ -250,17 +271,13 @@ int loop_process_callback( Loop this, jack_nframes_t nframes )
     int events = jack_midi_get_event_count( input_port_buffer );
 
     int read_next_state;
-    do
-    {
+    do {
         struct StateSchedule next;
         read_next_state = jack_ringbuffer_read( this->state_buffer, (char *) &next, sizeof( next ) );
-        if( read_next_state == 0 )
-        {
+        if( read_next_state == 0 ) {
             next.time = nframes;
             next.state = this->current_state.state;
-        }
-        else if( read_next_state != sizeof( next ) )
-        {
+        } else if( read_next_state != sizeof( next ) ) {
             fprintf( stderr, "invalid state buffer read in loop %s, can't continue processing\n", this->name );
             return -20;
         }
@@ -274,23 +291,19 @@ int loop_process_callback( Loop this, jack_nframes_t nframes )
             last_frame_time
         );
 
-        if( input_result != 0 )
-        {
+        if( input_result != 0 ) {
             return -30;
         }
 
-        switch( this->current_state.state )
-        {
+        switch( this->current_state.state ) {
             case STATE_PLAYBACK:
                 {
-                    if( previous_state.state != STATE_PLAYBACK )
-                    {
+                    if( previous_state.state != STATE_PLAYBACK ) {
                         this->last_playback_start = this->current_state.time + last_frame_time;
                     }
 
                     int playback_result = process_state_midi_playback( this, next.time, last_frame_time );
-                    if( playback_result != 0 )
-                    {
+                    if( playback_result != 0 ) {
                         return -40;
                     }
                 }
@@ -298,21 +311,21 @@ int loop_process_callback( Loop this, jack_nframes_t nframes )
 
             case STATE_RECORDING:
                 {
-                    if( previous_state.state != STATE_RECORDING )
-                    {
+                    if( previous_state.state != STATE_RECORDING ) {
                         this->recording_start = this->current_state.time + last_frame_time;
                     }
                 }
                 break;
+
+            case STATE_IDLE:
+                // No action.
+                break;
         }
 
         // Transition states.
-        if( next.state == STATE_PLAYBACK && this->current_state.state != STATE_PLAYBACK )
-        {
+        if( next.state == STATE_PLAYBACK && this->current_state.state != STATE_PLAYBACK ) {
             loop_buffer_reset_read( this->midi_loop_buffer );
-        }
-        else if( this->current_state.state == STATE_RECORDING && next.state != STATE_RECORDING )
-        {
+        } else if( this->current_state.state == STATE_RECORDING && next.state != STATE_RECORDING ) {
             this->recording_end = next.time + last_frame_time;
             this->recording_length = this->recording_end - this->recording_start;
         }
@@ -320,12 +333,10 @@ int loop_process_callback( Loop this, jack_nframes_t nframes )
         previous_state = this->current_state;
         this->current_state = next;
 
-    }
-    while( read_next_state );
+    } while( read_next_state );
 
     int output_result = process_midi_output( this, nframes, last_frame_time );
-    if( output_result != 0 )
-    {
+    if( output_result != 0 ) {
         return -50;
     }
 
@@ -343,38 +354,31 @@ static int process_state_midi_input(
         jack_nframes_t last_frame_time
     ) {
 
-    for( ; *event_index < events; ( *event_index )++ )
-    {
+    for( ; *event_index < events; ( *event_index )++ ) {
         struct MidiMessage input_message;
         int read_message_result = midi_message_from_port_buffer( &input_message, input_port_buffer, *event_index );
 
-        if( read_message_result != 0 )
-        {
+        if( read_message_result != 0 ) {
             continue; // Error was already reported at this point.
         }
 
-        if( input_message.time >= end_of_state )
-        {
+        if( input_message.time >= end_of_state ) {
             break;
         }
 
-        if( this->midi_through )
-        {
+        if( this->midi_through ) {
             int queue_result = queue_midi_message( this->midi_io_buffer, &input_message );
 
-            if( queue_result != 0 )
-            {
+            if( queue_result != 0 ) {
                 return -10;
             }
         }
 
-        if( this->current_state.state == STATE_RECORDING )
-        {
+        if( this->current_state.state == STATE_RECORDING ) {
             input_message.time = ( last_frame_time + input_message.time ) - this->recording_start;
             int pushed = loop_buffer_push( this->midi_loop_buffer, &input_message );
 
-            if( pushed < 0 )
-            {
+            if( pushed < 0 ) {
                 fprintf( stderr, "loop buffer full in loop %s, can't continue processing\n", this->name );
                 return -20;
             }
@@ -396,25 +400,21 @@ static int process_state_midi_playback(
 
     /* Only returns NULL if the loop is invalid to begin with.
      * Peek is constant time, so the readability gain seems worth it. */
-    while( recorded = loop_buffer_peek( this->midi_loop_buffer, &wrapped ) )
-    {
-        if( wrapped )
-        {
+    while( ( recorded = loop_buffer_peek( this->midi_loop_buffer, &wrapped ) ) ) {
+
+        if( wrapped ) {
             this->last_playback_start += this->recording_length;
         }
 
         jack_nframes_t playback_time = recorded->time + this->last_playback_start;
 
-        if( playback_time < end_of_state + last_frame_time )
-        {
+        if( playback_time < end_of_state + last_frame_time ) {
             struct MidiMessage adjusted = *recorded;
             adjusted.time = playback_time - last_frame_time;
 
             queue_midi_message( this->midi_io_buffer, &adjusted );
             loop_buffer_read_advance( this->midi_loop_buffer );
-        }
-        else
-        {
+        } else {
             break; // The loop will almost certainly exit this way.
         }
     }
@@ -431,20 +431,18 @@ static int process_midi_output( Loop this, jack_nframes_t nframes, jack_nframes_
 	struct MidiMessage ev;
 
 	port_buffer = jack_port_get_buffer( this->loop_output, nframes );
-	if( port_buffer == NULL )
-    {
+	if( port_buffer == NULL ) {
 		fprintf( stderr, "Couldn't get output buffer for loop %s\n", this->name );
 		return -10;
 	}
 
 	jack_midi_clear_buffer( port_buffer );
 
-	while( jack_ringbuffer_read_space( this->midi_io_buffer ) )
-    {
+	while( jack_ringbuffer_read_space( this->midi_io_buffer ) ) {
+
 		read = jack_ringbuffer_peek( this->midi_io_buffer, (char *)&ev, sizeof( ev ) );
 
-		if( read != sizeof( ev ) )
-        {
+		if( read != sizeof( ev ) ) {
 			fprintf( stderr, "Short read from the %s output ringbuffer, possible note loss.\n", this->name );
 			jack_ringbuffer_read_advance( this->midi_io_buffer, read );
 			continue;
@@ -463,8 +461,7 @@ static int process_midi_output( Loop this, jack_nframes_t nframes, jack_nframes_
 
 		buffer = jack_midi_event_reserve( port_buffer, ev.time, ev.len );
 
-		if( buffer == NULL )
-        {
+		if( buffer == NULL ) {
 			fprintf( stderr, "Couldn't reserve space on the output buffer for %s\n", this->name );
 			return -20;
 		}

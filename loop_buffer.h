@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 
 typedef struct loop_buffer_type *LoopBuffer;
 
-LoopBuffer loop_buffer_init( unsigned int capacity );
+LoopBuffer loop_buffer_init( size_t capacity );
 
 // Hides the implementation of LoopBuffer as a struct pointer.
 int loop_buffer_is_valid( LoopBuffer buffer );
