@@ -95,13 +95,16 @@ static int process_state_midi_playback(
 
 static int process_midi_output( Loop this, jack_nframes_t nframes, jack_nframes_t last_frame_time );
 
-int loop_init(
-        struct loop_type *this,
+int loop_new(
+        struct loop_type **loop_pointer, // The client owns this pointer - would simply return this, but wanted to return integer status.
         jack_client_t *jack_client,
         char *name,
         int midi_through,
         int playback_after_recording
     ) {
+
+    *loop_pointer = malloc( sizeof( struct loop_type ) );
+    struct loop_type *this = *loop_pointer;
 
     // Main loop buffer.
     LoopBuffer midi_loop_buffer = loop_buffer_init( MIDI_LOOP_BUFFER_SIZE ); 

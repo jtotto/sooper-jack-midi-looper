@@ -22,8 +22,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 
 typedef struct loop_type *Loop;
 
-int loop_init(
-    Loop this,
+int loop_new(
+    Loop *new_loop,
     jack_client_t *jack_client,
     char *name,
     int midi_through,

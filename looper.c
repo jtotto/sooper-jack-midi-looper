@@ -29,8 +29,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 #include <jack/ringbuffer.h>
 
 #include <gtk/gtk.h>
+#include <glib.h>
 
 #include "midi_message.h"
+#include "loop.h"
 
 #define NOTE_OFF 0x80
 #define NOTE_ON 0x90
@@ -39,13 +41,24 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 jack_client_t *jack_client;
 jack_port_t *control_input;
 
-jack_nframes_t sampleRate;
-int rateFlag = 0;
+jack_nframes_t sample_rate;
+int rate_flag = 0;
+
+GHashTable *loop_table;
+
+struct ui_loop_type {
+    int row_index;
+    Loop loop;
+};
+
+GtkGrid *loop_grid;
+gint current_row_index = 0;
+void ui_remove_loop( GtkWidget *widget, gpointer data );
 
 int sample_rate_change( jack_nframes_t nframes, void *notUsed )
 {
-    if( !rateFlag ) {
-        rateFlag = 1;
+    if( !rate_flag ) {
+        rate_flag = 1;
         return 0;
     }
 
@@ -97,7 +110,7 @@ void init_jack( void )
 
     jack_set_process_callback( jack_client, process, NULL );
 
-    sampleRate = jack_get_sample_rate( jack_client );
+    sample_rate = jack_get_sample_rate( jack_client );
 
     control_input = jack_port_register(
         jack_client,
@@ -124,38 +137,157 @@ void close_jack( void )
     jack_client_close( jack_client );
 }
 
+char *homebrew_strdup( const char *in )
+{   
+    char *duplicate = malloc( ( strlen( in ) + 1 ) * sizeof( char ) );
+    if( duplicate ) {   
+        strcpy( duplicate, in );
+    }
+    return duplicate;
+}
+
+gboolean str_hash_equality_func( gconstpointer str_a, gconstpointer str_b )
+{
+    return strcmp( str_a, str_b);
+}
+
+void str_hash_destroy_key( gpointer str )
+{
+    free( str );
+}
+
+void destroy_ui_loop( gpointer ui_loop_pointer )
+{
+    struct ui_loop_type *ui_loop = (struct ui_loop_type *) ui_loop_pointer;
+    free( ui_loop->loop );
+    free( ui_loop );
+}
+
 gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
     gtk_main_quit();
     return FALSE;
 }
 
+/* Pulled this logic from a forum post almost verbatim - it strikes
+   me as odd that this much plumbing is need for such a simple UI
+   interaction. */
+char *loop_entry_dialog()
+{
+    GtkWidget *dialog;
+    GtkWidget *entry;
+    GtkWidget *content_area;
+
+    dialog = gtk_dialog_new();
+    gtk_dialog_add_button( GTK_DIALOG( dialog ), "Create", 0 );
+
+    content_area = gtk_dialog_get_content_area( GTK_DIALOG( dialog ) );
+    entry = gtk_entry_new();
+    gtk_container_add( GTK_CONTAINER( content_area ), entry );
+
+    gtk_widget_show_all( dialog );
+    gint result = gtk_dialog_run( GTK_DIALOG( dialog ) );
+
+    const gchar *entry_line;
+    char *input_name = NULL;
+
+    if( result == 0 ) {
+        entry_line = gtk_entry_get_text(GTK_ENTRY(entry));
+
+        if( strlen( entry_line ) ) {
+            input_name = homebrew_strdup( entry_line );
+        }
+    }
+
+    gtk_widget_destroy(dialog);
+
+    return input_name;
+}
+
+void ui_add_loop( GtkWidget *widget, gpointer data )
+{
+    char *loop_name = loop_entry_dialog();
+
+    if( !loop_name || g_hash_table_lookup( loop_table, loop_name ) ) {
+        return;
+    }
+
+    Loop new_loop = NULL; // Is initialized by the init function.
+
+    // TODO: allow user specification of play-through and playback behaviour settings.
+    loop_new(
+        &new_loop,
+        jack_client,
+        loop_name,
+        1,
+        1
+    );
+
+    struct ui_loop_type *ui_loop = malloc( sizeof( struct ui_loop_type ) );
+    ui_loop->row_index = current_row_index;
+    ui_loop->loop = new_loop;
+
+    g_hash_table_insert(
+        loop_table,
+        loop_name,
+        ui_loop
+    );
+
+    // Update the UI.
+    gtk_grid_insert_row( loop_grid, current_row_index );
+
+    GtkWidget *label = gtk_label_new( loop_name );
+    gtk_grid_attach( loop_grid, label, 0, current_row_index, 1, 1 );
+
+    GtkWidget *remove_row_button = gtk_button_new_with_label( "Remove Loop" );
+    gtk_grid_attach( loop_grid, remove_row_button, 1, current_row_index, 1, 1 );
+    g_signal_connect( remove_row_button, "clicked", G_CALLBACK( ui_remove_loop ), loop_name );
+
+    gtk_widget_show( label );
+    gtk_widget_show( remove_row_button );
+
+    current_row_index++;  // Update for next use.
+}
+
+void ui_remove_loop( GtkWidget *widget, gpointer data )
+{
+    
+}
+
 void init_gui()
 {
-
     GtkWidget *window;
     GtkWidget *label;
 
-    window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    window = gtk_window_new( GTK_WINDOW_TOPLEVEL );
 
-    gtk_window_set_title (GTK_WINDOW(window), "MIDI Looper");
+    gtk_window_set_title( GTK_WINDOW(window), "MIDI Looper" );
 
-    g_signal_connect(window, "delete-event", G_CALLBACK(delete_event), NULL);
-    gtk_container_set_border_width(GTK_CONTAINER(window), 10); // Pretty self-explanatory - sets the border width of 'window.'
+    g_signal_connect( window, "delete-event", G_CALLBACK( delete_event ), NULL );
+    gtk_container_set_border_width( GTK_CONTAINER( window ), 10 );
 
     GtkWidget *notebook = gtk_notebook_new();
-    gtk_container_add(GTK_CONTAINER(window), notebook ); 
+    gtk_container_add( GTK_CONTAINER( window ), notebook ); 
 
     label = gtk_label_new( "Loops" );
     gtk_widget_show( label );
 
-    GtkGrid *grid = gtk_grid_new();
-    gtk_grid_set_row_spacing( grid, 5 );
-    gtk_notebook_append_page( (GtkNotebook *)notebook, grid, label );
+    loop_grid = (GtkGrid *) gtk_grid_new();
+    gtk_grid_set_row_spacing( loop_grid, 5 );
+    gtk_notebook_append_page( (GtkNotebook *)notebook, (GtkWidget *) loop_grid, label );
+
+    GtkWidget *add_row_button = gtk_button_new_with_label( "Add Loop" );
+    gtk_widget_show( add_row_button );
+    gtk_grid_attach( loop_grid, add_row_button, 1, 0, 1, 1);
+    g_signal_connect( add_row_button, "clicked", G_CALLBACK( ui_add_loop ), NULL);
+
+    gtk_widget_show( (GtkWidget *)loop_grid );
 
     label = gtk_label_new( "MIDI Mappings" );
+    GtkWidget *temp = gtk_label_new( "Temp" );
     gtk_widget_show( label );
-    gtk_notebook_append_page( (GtkNotebook *)notebook, /*grid*/, label );
+    gtk_widget_show( temp );
+    gtk_notebook_append_page( (GtkNotebook *)notebook, temp, label );
  
     gtk_widget_show( notebook );
     gtk_widget_show( window );
@@ -163,6 +295,14 @@ void init_gui()
 
 int main(int argc, char *argv[])
 {
+    // Create the central loop collection.
+    loop_table = g_hash_table_new_full(
+        g_str_hash,
+        str_hash_equality_func,
+        str_hash_destroy_key,
+        destroy_ui_loop
+    );
+
     // Fire up JACK.
     init_jack();
 
@@ -172,6 +312,7 @@ int main(int argc, char *argv[])
     gtk_main();
 
     // At this point, the program has been terminated.
+    g_hash_table_destroy( loop_table );
     close_jack();
 
     return 0;
