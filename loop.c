@@ -95,6 +95,13 @@ static int process_state_midi_playback(
 
 static int process_midi_output( Loop this, jack_nframes_t nframes, jack_nframes_t last_frame_time );
 
+#undef BAIL
+#define BAIL( message, code ) \
+    fprintf( stderr, message, name );\
+    loop_free( this );\
+    *loop_pointer = NULL;\
+    return code;
+
 int loop_new(
         struct loop_type **loop_pointer, // The client owns this pointer - would simply return this, but wanted to return integer status.
         jack_client_t *jack_client,
@@ -105,91 +112,81 @@ int loop_new(
 
     *loop_pointer = malloc( sizeof( struct loop_type ) );
     struct loop_type *this = *loop_pointer;
+    // Null-initialize all dynamically allocated members.
+    this->loop_input = NULL;
+    this->loop_output = NULL;
+    this->loop_input_name = NULL;
+    this->loop_output_name = NULL;
+    this->midi_io_buffer = NULL;
+    this->state_buffer = NULL;
 
     // Main loop buffer.
-    LoopBuffer midi_loop_buffer = loop_buffer_init( MIDI_LOOP_BUFFER_SIZE ); 
-    if( !loop_buffer_is_valid( midi_loop_buffer ) ) {
-        fprintf( stderr, "Cannot create loop buffer for %s.\n", name );
-        return -1;
+    this->midi_loop_buffer = loop_buffer_init( MIDI_LOOP_BUFFER_SIZE ); 
+    if( !loop_buffer_is_valid( this->midi_loop_buffer ) ) {
+        BAIL( "Cannot create loop buffer for %s.\n", -1 );
     }
 
     // I/O ringbuffer.
-    jack_ringbuffer_t *midi_io_buffer = jack_ringbuffer_create( MIDI_IO_BUFFER_SIZE );
+    this->midi_io_buffer = jack_ringbuffer_create( MIDI_IO_BUFFER_SIZE );
 
-    if ( midi_io_buffer == NULL) {
-        fprintf( stderr, "Cannot create JACK MIDI ringbuffer for %s.\n", name );
-        return -10;
+    if ( this->midi_io_buffer == NULL) {
+        BAIL( "Cannot create JACK MIDI ringbuffer for %s.\n", -10 );
     }
 
-    jack_ringbuffer_mlock( midi_io_buffer ); // Prevent paging of the I/O buffer.
+    jack_ringbuffer_mlock( this->midi_io_buffer ); // Prevent paging of the I/O buffer.
 
     // State change ringbuffer.
-    jack_ringbuffer_t *state_buffer = jack_ringbuffer_create( STATE_BUFFER_SIZE );
+    this->state_buffer = jack_ringbuffer_create( STATE_BUFFER_SIZE );
 
-    if( state_buffer == NULL ) {
-        fprintf( stderr, "Cannot create state change ringbuffer for %s.\n", name );
-        return -11;
+    if( this->state_buffer == NULL ) {
+        BAIL( "Cannot create state change ringbuffer for %s.\n", -11 );
     }
 
-    jack_ringbuffer_mlock( state_buffer );
+    jack_ringbuffer_mlock( this->state_buffer );
 
     // Loop ports.
     size_t length_of_name = strlen( name );
 
-    char *loop_output_name = malloc( length_of_name + 12 );
-    if( sprintf( loop_output_name, "loop_%s_output", name ) < 0 ) {
-        fprintf( stderr, "Error building output port name string for %s.\n", name );
-        return -20;
+    this->loop_output_name = malloc( length_of_name + 12 );
+    if( sprintf( this->loop_output_name, "loop_%s_output", name ) < 0 ) {
+        BAIL( "Error building output port name string for %s.\n", -20 );
     }
 
-    jack_port_t *loop_output = jack_port_register(
+    this->loop_output = jack_port_register(
         jack_client,
-        loop_output_name,
+        this->loop_output_name,
         JACK_DEFAULT_MIDI_TYPE,
         JackPortIsOutput,
         0
     );
 
-    if( loop_output == NULL ) {
-        fprintf( stderr, "Could not register JACK output port for %s.\n", name );
-        return -30;
+    if( this->loop_output == NULL ) {
+        BAIL( "Could not register JACK output port for %s.\n", -30 );
     }
 
-    char *loop_input_name = malloc( length_of_name + 11 );
-    if( sprintf( loop_input_name, "loop_%s_input", name ) < 0 ) {
-        fprintf( stderr, "Error building input port name string for %s.\n", name );
-        return -40;
+    this->loop_input_name = malloc( length_of_name + 11 );
+    if( sprintf( this->loop_input_name, "loop_%s_input", name ) < 0 ) {
+        BAIL( "Error building input port name string for %s.\n", -40 );
     }
 
-    jack_port_t *loop_input = jack_port_register(
+    this->loop_input = jack_port_register(
         jack_client,
-        loop_input_name,
+        this->loop_input_name,
         JACK_DEFAULT_MIDI_TYPE,
         JackPortIsInput,
         0
     );
 
-    if( loop_input == NULL ) {
-        fprintf( stderr, "Could not register JACK loop input port for %s.\n.", name );
-        return -50;
+    if( this->loop_input == NULL ) {
+        BAIL( "Could not register JACK loop input port for %s.\n.", -50 );
     }
 
-    // Set members.
+    // Set remaining members.
     this->name = name;
     this->midi_through = midi_through;
     this->playback_after_recording = playback_after_recording;
 
     this->jack_client = jack_client;
-
-    this->loop_output_name = loop_output_name;
-    this->loop_output = loop_output;
-
-    this->loop_input_name = loop_input_name;
-    this->loop_input = loop_input;
-
-    this->midi_io_buffer = midi_io_buffer;
-    this->midi_loop_buffer = midi_loop_buffer;
-    this->state_buffer = state_buffer;
 
     this->current_state.time = jack_last_frame_time( jack_client );
     this->current_state.state = STATE_IDLE;
@@ -199,10 +196,39 @@ int loop_new(
 
 void loop_free( struct loop_type *this )
 {
-    jack_ringbuffer_free( this->midi_io_buffer );
-    jack_ringbuffer_free( this->state_buffer );
+    if( this ) {
+        // JACK ringbuffers.
+        if( this->midi_io_buffer ) {
+            jack_ringbuffer_free( this->midi_io_buffer );
+        }
 
-    loop_buffer_free( this-> midi_loop_buffer );
+        if( this->state_buffer ) {
+            jack_ringbuffer_free( this->state_buffer );
+        }
+
+        // Ports and their names.
+        if( this->loop_output_name ) {
+            free( this->loop_output_name );
+        }
+
+        if( this->loop_output ) {
+            jack_port_disconnect( this->jack_client, this->loop_output );
+        }
+
+        if( this->loop_input_name ) {
+            free( this->loop_input_name );
+        }
+
+        if( this->loop_input ) {
+            jack_port_disconnect( this->jack_client, this->loop_input );
+        }
+
+        // Our custom loop buffer.
+        loop_buffer_free( this->midi_loop_buffer );
+
+        // Ourself.
+        free( this );
+    }
 }
 
 void loop_set_midi_through( Loop this, int set )

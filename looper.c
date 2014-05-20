@@ -209,19 +209,26 @@ void ui_add_loop( GtkWidget *widget, gpointer data )
     char *loop_name = loop_entry_dialog();
 
     if( !loop_name || g_hash_table_lookup( loop_table, loop_name ) ) {
+        free( loop_name );
         return;
     }
 
     Loop new_loop = NULL; // Is initialized by the init function.
 
     // TODO: allow user specification of play-through and playback behaviour settings.
-    loop_new(
+    int success = loop_new(
         &new_loop,
         jack_client,
         loop_name,
         1,
         1
     );
+
+    if( success != 0 ) {
+        fprintf( stderr, "Couldn't allocate a new loop, bailing on UI steps.\n" );
+        free( loop_name );
+        return;
+    }
 
     struct ui_loop_type *ui_loop = malloc( sizeof( struct ui_loop_type ) );
     ui_loop->row_index = current_row_index;

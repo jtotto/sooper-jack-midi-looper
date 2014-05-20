@@ -43,6 +43,7 @@ struct loop_buffer_type *loop_buffer_init( size_t capacity )
     );
 
     if( buffer_struct->buffer == NULL ) {
+        free( buffer_struct );
         return NULL;
     }
 
@@ -75,8 +76,10 @@ void loop_buffer_reset_write( struct loop_buffer_type *loop_buffer )
 
 void loop_buffer_free( struct loop_buffer_type *loop_buffer )
 {
-    free( loop_buffer->buffer );
-    free( loop_buffer );
+    if( loop_buffer ) {
+        free( loop_buffer->buffer );
+        free( loop_buffer );
+    }
 }
 
 int loop_buffer_push( struct loop_buffer_type *loop_buffer, struct MidiMessage *message )
