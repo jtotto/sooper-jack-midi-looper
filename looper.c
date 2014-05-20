@@ -148,7 +148,7 @@ char *homebrew_strdup( const char *in )
 
 gboolean str_hash_equality_func( gconstpointer str_a, gconstpointer str_b )
 {
-    return strcmp( str_a, str_b);
+    return strcmp( str_a, str_b) == 0;
 }
 
 void str_hash_destroy_key( gpointer str )
