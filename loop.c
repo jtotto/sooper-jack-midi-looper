@@ -212,7 +212,7 @@ void loop_free( struct loop_type *this )
         }
 
         if( this->loop_output ) {
-            jack_port_disconnect( this->jack_client, this->loop_output );
+            jack_port_unregister( this->jack_client, this->loop_output );
         }
 
         if( this->loop_input_name ) {
@@ -220,7 +220,7 @@ void loop_free( struct loop_type *this )
         }
 
         if( this->loop_input ) {
-            jack_port_disconnect( this->jack_client, this->loop_input );
+            jack_port_unregister( this->jack_client, this->loop_input );
         }
 
         // Our custom loop buffer.

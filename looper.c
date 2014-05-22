@@ -159,7 +159,7 @@ void str_hash_destroy_key( gpointer str )
 void destroy_ui_loop( gpointer ui_loop_pointer )
 {
     struct ui_loop_type *ui_loop = (struct ui_loop_type *) ui_loop_pointer;
-    free( ui_loop->loop );
+    loop_free( ui_loop->loop );
     free( ui_loop );
 }
 
@@ -258,7 +258,12 @@ void ui_add_loop( GtkWidget *widget, gpointer data )
 
 void ui_remove_loop( GtkWidget *widget, gpointer data )
 {
-    
+    gchar *loop_name = data;
+    struct ui_loop_type *ui_loop = g_hash_table_lookup( loop_table, loop_name );
+
+    printf( "%d\n", ui_loop->row_index );
+    gtk_grid_remove_row( loop_grid, ui_loop->row_index );
+    g_hash_table_remove( loop_table, loop_name );
 }
 
 void init_gui()
