@@ -15,30 +15,27 @@
  15 along with this program; if not, write to the Free Software
  16 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. */
 
-#ifndef CONTROL_ACTION_H
-#define CONTROL_ACTION_H
+#ifndef CONTROL_ACTION_TABLE_H
+#define CONTROL_ACTION_TABLE_H
 
+#include <glib.h>
 #include "loop.h"
 
+typedef GHashTable ControlActionTable;
+
+typedef void (*LoopControlFunc)( Loop loop, jack_nframes_t time );
+typedef int midi_hash_key_type;
+
 struct ControlAction {
-    void (*loop_action)( Loop loop, jack_nframes_t time );
+    LoopControlFunc loop_action;
     Loop loop;
 };
 
-typedef struct ControlActionListNode *ControlActionList;
+ControlActionTable *control_action_table_new();
 
-void control_action_list_init( ControlActionList *list );
-
-// Dynamically allocates memory - NOT safe for use in the process callback.
-void control_action_list_push(
-    ControlActionList *list,
-    void (*loop_action)( Loop loop, jack_nframes_t time ),
-    Loop loop
-);
-
-void control_action_list_trigger_all(
-    ControlActionList list,
-    jack_nframes_t time
+void control_action_table_insert(
+    midi_hash_key_type midi,
+    struct ControlAction *action // We don't own the actions - they're injected.
 );
 
 #endif

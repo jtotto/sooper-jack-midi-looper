@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 
 #include "midi_message.h"
 #include "loop.h"
+#include "control_action_table.h"
 
 #define NOTE_OFF 0x80
 #define NOTE_ON 0x90
@@ -44,16 +45,27 @@ jack_port_t *control_input;
 jack_nframes_t sample_rate;
 int rate_flag = 0;
 
-GHashTable *loop_table;
+GHashTable *loop_table; // Enforces uniqueness of loop names.
+GHashTable *mapping_table;
 
 struct ui_loop_type {
     int row_index;
     Loop loop;
 };
 
+struct ui_mapping_type {
+    int row_index;
+    midi_hash_key_type midi_mapping;
+    struct ControlAction action_data;
+};
+
 GtkGrid *loop_grid;
-gint current_row_index = 0;
+gint current_low_row_index = 0;
 void ui_remove_loop( GtkWidget *widget, gpointer data );
+
+/* ----------------------------------------------------   
+   JACK
+   ---------------------------------------------------- */
 
 int sample_rate_change( jack_nframes_t nframes, void *notUsed )
 {
@@ -137,6 +149,10 @@ void close_jack( void )
     jack_client_close( jack_client );
 }
 
+/* ----------------------------------------------------   
+   Loops
+   ---------------------------------------------------- */
+
 char *homebrew_strdup( const char *in )
 {   
     char *duplicate = malloc( ( strlen( in ) + 1 ) * sizeof( char ) );
@@ -144,11 +160,6 @@ char *homebrew_strdup( const char *in )
         strcpy( duplicate, in );
     }
     return duplicate;
-}
-
-gboolean str_hash_equality_func( gconstpointer str_a, gconstpointer str_b )
-{
-    return strcmp( str_a, str_b) == 0;
 }
 
 void str_hash_destroy_key( gpointer str )
@@ -161,12 +172,6 @@ void destroy_ui_loop( gpointer ui_loop_pointer )
     struct ui_loop_type *ui_loop = (struct ui_loop_type *) ui_loop_pointer;
     loop_free( ui_loop->loop );
     free( ui_loop );
-}
-
-gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-    gtk_main_quit();
-    return FALSE;
 }
 
 /* Pulled this logic from a forum post almost verbatim - it strikes
@@ -231,7 +236,7 @@ void ui_add_loop( GtkWidget *widget, gpointer data )
     }
 
     struct ui_loop_type *ui_loop = malloc( sizeof( struct ui_loop_type ) );
-    ui_loop->row_index = current_row_index;
+    ui_loop->row_index = current_low_row_index;
     ui_loop->loop = new_loop;
 
     g_hash_table_insert(
@@ -241,19 +246,29 @@ void ui_add_loop( GtkWidget *widget, gpointer data )
     );
 
     // Update the UI.
-    gtk_grid_insert_row( loop_grid, current_row_index );
+    gtk_grid_insert_row( loop_grid, current_low_row_index );
 
     GtkWidget *label = gtk_label_new( loop_name );
-    gtk_grid_attach( loop_grid, label, 0, current_row_index, 1, 1 );
+    gtk_grid_attach( loop_grid, label, 0, current_low_row_index, 1, 1 );
 
     GtkWidget *remove_row_button = gtk_button_new_with_label( "Remove Loop" );
-    gtk_grid_attach( loop_grid, remove_row_button, 1, current_row_index, 1, 1 );
+    gtk_grid_attach( loop_grid, remove_row_button, 1, current_low_row_index, 1, 1 );
     g_signal_connect( remove_row_button, "clicked", G_CALLBACK( ui_remove_loop ), loop_name );
 
     gtk_widget_show( label );
     gtk_widget_show( remove_row_button );
 
-    current_row_index++;  // Update for next use.
+    current_low_row_index++;  // Update for next use.
+}
+
+void decrement_loop_indices( gpointer key, gpointer value, gpointer data )
+{
+    int *removed_index = data;
+    struct ui_loop_type *ui_loop = value;
+
+    if( ui_loop->row_index > *removed_index ) {
+        ui_loop->row_index--;
+    }
 }
 
 void ui_remove_loop( GtkWidget *widget, gpointer data )
@@ -261,9 +276,31 @@ void ui_remove_loop( GtkWidget *widget, gpointer data )
     gchar *loop_name = data;
     struct ui_loop_type *ui_loop = g_hash_table_lookup( loop_table, loop_name );
 
-    printf( "%d\n", ui_loop->row_index );
+    int removed_row_index = ui_loop->row_index;
     gtk_grid_remove_row( loop_grid, ui_loop->row_index );
     g_hash_table_remove( loop_table, loop_name );
+    g_hash_table_foreach( loop_table, decrement_loop_indices, &removed_row_index ); // This does NOT scale - but shouldn't ever have to.
+    current_low_row_index--;
+}
+
+/* ----------------------------------------------------   
+   MIDI Mappings
+   ---------------------------------------------------- */
+
+void destroy_control_mapping( gpointer ui_mapping_pointer )
+{
+    struct ui_loop_type *ui_loop = (struct ui_mapping_type *) ui_mapping_pointer;
+    //TODO: remove the 
+}
+
+/* ----------------------------------------------------   
+   GUI Top Level
+   ---------------------------------------------------- */
+
+gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
+{
+    gtk_main_quit();
+    return FALSE;
 }
 
 void init_gui()
@@ -310,9 +347,16 @@ int main(int argc, char *argv[])
     // Create the central loop collection.
     loop_table = g_hash_table_new_full(
         g_str_hash,
-        str_hash_equality_func,
+        g_str_equal,
         str_hash_destroy_key,
         destroy_ui_loop
+    );
+
+    mapping_table = g_hash_table_new_full(
+        g_direct_hash,
+        g_direct_equal,
+        NULL,
+        destroy_control_mapping
     );
 
     // Fire up JACK.

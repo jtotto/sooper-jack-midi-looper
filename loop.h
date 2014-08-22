@@ -32,6 +32,8 @@ int loop_new(
 
 void loop_free( Loop this );
 
+const char *loop_get_name( Loop this );
+
 void loop_toggle_playback( Loop this, jack_nframes_t time );
 void loop_toggle_recording( Loop this, jack_nframes_t time );
 

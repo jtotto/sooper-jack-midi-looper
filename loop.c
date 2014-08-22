@@ -231,6 +231,11 @@ void loop_free( struct loop_type *this )
     }
 }
 
+const char *loop_get_name( Loop this )
+{
+    return (const char *)this->name;
+}
+
 void loop_set_midi_through( Loop this, int set )
 {
     this->midi_through = set;
