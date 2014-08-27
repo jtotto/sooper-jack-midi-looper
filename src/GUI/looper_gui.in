@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+
+import sys
+sys.path.insert( 1, "@pythondir@" )
+
+from jack_midi_looper_gui.gui_main import MainApplicationWrapper
+
+if __name__ == "__main__":
+    app = MainApplicationWrapper( package="@PACKAGE@", version="@VERSION@" )
+    app.run()

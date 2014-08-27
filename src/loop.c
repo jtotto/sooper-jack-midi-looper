@@ -47,7 +47,7 @@ struct StateSchedule {
 struct loop_type {
 
     // Injected.
-    char *name;
+    const char *name;
     int midi_through;
     int playback_after_recording;
 
@@ -105,7 +105,7 @@ static int process_midi_output( Loop this, jack_nframes_t nframes, jack_nframes_
 int loop_new(
         struct loop_type **loop_pointer, // The client owns this pointer - would simply return this, but wanted to return integer status.
         jack_client_t *jack_client,
-        char *name,
+        const char *name,
         int midi_through,
         int playback_after_recording
     ) {
@@ -233,7 +233,7 @@ void loop_free( struct loop_type *this )
 
 const char *loop_get_name( Loop this )
 {
-    return (const char *)this->name;
+    return this->name;
 }
 
 void loop_set_midi_through( Loop this, int set )
@@ -241,9 +241,19 @@ void loop_set_midi_through( Loop this, int set )
     this->midi_through = set;
 }
 
+int loop_get_midi_through( Loop this )
+{
+    return this->midi_through;
+}
+
 void loop_set_playback_after_recording( Loop this, int set )
 {
     this->playback_after_recording = set;
+}
+
+int loop_get_playback_after_recording( Loop this )
+{
+    return this->playback_after_recording;
 }
 
 void loop_toggle_playback( Loop this, jack_nframes_t time )

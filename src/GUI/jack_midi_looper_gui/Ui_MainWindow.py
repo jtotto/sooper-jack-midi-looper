@@ -1,0 +1,98 @@
+# -*- coding: utf-8 -*-
+
+# Form implementation generated from reading ui file 'looper.ui'
+#
+# Created: Fri Aug 22 15:43:04 2014
+#      by: PyQt5 UI code generator 5.3.1
+#
+# WARNING! All changes made in this file will be lost!
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+class Ui_MainWindow(object):
+    def setupUi(self, MainWindow):
+        MainWindow.setObjectName("MainWindow")
+        MainWindow.setMinimumSize(QtCore.QSize(435, 420))
+        self.centralwidget = QtWidgets.QWidget(MainWindow)
+        self.centralwidget.setObjectName("centralwidget")
+        self.tabWidget = QtWidgets.QTabWidget(self.centralwidget)
+        self.tabWidget.setGeometry(QtCore.QRect(0, 10, 431, 381))
+        self.tabWidget.setObjectName("tabWidget")
+        self.loopTab = QtWidgets.QWidget()
+        self.loopTab.setObjectName("loopTab")
+        self.frame = QtWidgets.QFrame(self.loopTab)
+        self.frame.setGeometry(QtCore.QRect(10, 10, 411, 291))
+        self.frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frame.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frame.setObjectName("frame")
+        self.loopListView = QtWidgets.QListView(self.frame)
+        self.loopListView.setGeometry(QtCore.QRect(10, 10, 391, 271))
+        self.loopListView.setObjectName("loopListView")
+        self.addLoopButton = QtWidgets.QToolButton(self.loopTab)
+        self.addLoopButton.setGeometry(QtCore.QRect(360, 310, 23, 25))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setWeight(75)
+        self.addLoopButton.setFont(font)
+        self.addLoopButton.setObjectName("addLoopButton")
+        self.removeLoopButton = QtWidgets.QToolButton(self.loopTab)
+        self.removeLoopButton.setGeometry(QtCore.QRect(380, 310, 23, 25))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setWeight(75)
+        self.removeLoopButton.setFont(font)
+        self.removeLoopButton.setObjectName("removeLoopButton")
+        self.tabWidget.addTab(self.loopTab, "")
+        self.mappingTab = QtWidgets.QWidget()
+        self.mappingTab.setObjectName("mappingTab")
+        self.frame_2 = QtWidgets.QFrame(self.mappingTab)
+        self.frame_2.setGeometry(QtCore.QRect(10, 10, 411, 291))
+        self.frame_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.frame_2.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.frame_2.setObjectName("frame_2")
+        self.mappingTableView = QtWidgets.QTableView(self.frame_2)
+        self.mappingTableView.setGeometry(QtCore.QRect(10, 10, 391, 271))
+        self.mappingTableView.setObjectName("mappingTableView")
+        self.addMappingButton = QtWidgets.QToolButton(self.mappingTab)
+        self.addMappingButton.setGeometry(QtCore.QRect(360, 310, 23, 25))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setWeight(75)
+        self.addMappingButton.setFont(font)
+        self.addMappingButton.setObjectName("addMappingButton")
+        self.removeMappingButton = QtWidgets.QToolButton(self.mappingTab)
+        self.removeMappingButton.setGeometry(QtCore.QRect(380, 310, 23, 25))
+        font = QtGui.QFont()
+        font.setPointSize(14)
+        font.setBold(True)
+        font.setWeight(75)
+        self.removeMappingButton.setFont(font)
+        self.removeMappingButton.setObjectName("removeMappingButton")
+        self.tabWidget.addTab(self.mappingTab, "")
+        MainWindow.setCentralWidget(self.centralwidget)
+        self.menubar = QtWidgets.QMenuBar(MainWindow)
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 435, 25))
+        self.menubar.setObjectName("menubar")
+        MainWindow.setMenuBar(self.menubar)
+
+        self.retranslateUi(MainWindow)
+        self.tabWidget.setCurrentIndex(0)
+        self.addLoopButton.clicked.connect(MainWindow.newLoop)
+        self.removeLoopButton.clicked.connect(MainWindow.removeLoops)
+        self.addMappingButton.clicked.connect(MainWindow.newMapping)
+        self.removeMappingButton.clicked.connect(MainWindow.removeMappings)
+        QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
+    def retranslateUi(self, MainWindow):
+        _translate = QtCore.QCoreApplication.translate
+        MainWindow.setWindowTitle(_translate("MainWindow", "JACK MIDI Looper"))
+        self.addLoopButton.setText(_translate("MainWindow", "+"))
+        self.removeLoopButton.setText(_translate("MainWindow", "-"))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.loopTab), _translate("MainWindow", "Loops"))
+        self.addMappingButton.setText(_translate("MainWindow", "+"))
+        self.removeMappingButton.setText(_translate("MainWindow", "-"))
+        self.tabWidget.setTabText(self.tabWidget.indexOf(self.mappingTab), _translate("MainWindow", "MIDI Mappings"))
+

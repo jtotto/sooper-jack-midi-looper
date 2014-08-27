@@ -1,0 +1,98 @@
+OSC interface to the JACK MIDI Looper engine
+
+This borrows VERY heavily from the interface to the SooperLooper engine.
+In fact, some sections are taken verbatim from its interface specification.
+https://github.com/essej/sooperlooper
+
+Arguments are prefixed with type: where s=string, i=integer, f=float
+
+PING Engine
+
+ /ping s:return_url s:return_path
+
+ If engine is there, it will respond to the given URL and PATH
+  with an OSC message with arguments:
+     s:hosturl  s:version  i:loopcount
+
+
+Loop commands and parameter gets/sets paths are all prefixed with:
+  /jml/<name>/   where <name> is the loop name
+
+SET PARAMETER VALUES
+
+/jml/<name>/set  s:control_values
+   To set a parameter for a loop.
+
+ where control_values is a representation of the control values in the form:
+
+    "midi_through playback_after_recording"
+    midi_through                -   0 = off, not 0 = on
+    playback_after_recording    -   0 = off, not 0 = on
+
+    for any of the above, specifying "same" will result in no change to the parameter
+
+
+GET PARAMETER VALUES
+
+/jml/<name>/get  s:return_url  s: return_path
+
+  Which returns an OSC message to the given return url and path with
+  the arguments:
+      s:loop_name  s:control_values 
+    
+LOOP QUERY/ADD/REMOVE
+
+/loop_list  s:return_url  s:retpath
+  sends an 'add' change to the return URL for every loop
+
+/loop_add  s:name
+  adds a new loop with the specified name
+
+/loop_del  s:name
+  removes the specified loop
+
+SHUTDOWN
+
+/quit
+   shutdown engine
+
+
+REGISTER FOR CONTROL CHANGES
+
+ The following messages register and unregister from update events
+ which will be sent the returl and retpath specified.  The update OSC message
+ has the following parameters:
+     s:loopname  s:ctrl  f:control_value
+
+ /jml/<name>/register_auto_update  s:returl s:retpath
+ /jml/<name>/unregister_auto_update  s:returl s:retpath
+
+    registers/unregisters for automatic updates. This is handy for receiving 
+    updates for output controls such as state and position.  
+ 
+ /register_auto_update  s:ctrl s:returl s:retpath
+ /unregister_auto_update  s:ctrl s:returl s:retpath
+    
+    ctrl is one of 'loops' or 'mappings' or 'errors'
+
+MIDI BINDING CONTROL
+
+Slightly alters the SooperLooper MIDI binding serialization scheme:
+    //    ch type param cmd instance
+    //
+    //    ch = midi channel starting from 0
+    //    type is one of:  'cc_on' = control change on, 'cc_off' = control change off 'on' = note on  'off' = note off
+    //    param = # of midi parameter
+    //
+    //    cmd is one of ( 'toggle_playback', 'toggle_recording' )
+    //    instance is loop name
+
+ /midi_binding_list  s:returl  s:retpath
+    returns a serialization of all of the engine's current MIDI bindings
+    sends an 'add' message followed by the serialization for each message
+    
+ /remove_midi_binding  s:binding_serialization
+     
+ /add_midi_binding  s:binding_serialization
+
+ /clear_midi_bindings

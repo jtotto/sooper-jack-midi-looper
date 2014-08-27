@@ -25,7 +25,7 @@ typedef struct loop_type *Loop;
 int loop_new(
     Loop *new_loop,
     jack_client_t *jack_client,
-    char *name,
+    const char *name,
     int midi_through,
     int playback_after_recording
 );
@@ -37,7 +37,9 @@ const char *loop_get_name( Loop this );
 void loop_toggle_playback( Loop this, jack_nframes_t time );
 void loop_toggle_recording( Loop this, jack_nframes_t time );
 
+int loop_get_midi_through( Loop this );
 void loop_set_midi_through( Loop this, int set );
+int loop_get_playback_after_recording( Loop this );
 void loop_set_playback_after_recording( Loop this, int set );
 
 int loop_process_callback( Loop this, jack_nframes_t nframes );
