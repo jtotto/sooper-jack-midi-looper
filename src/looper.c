@@ -45,6 +45,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 #define NOTE_ON 0x90
 #define CONTROL_CHANGE 0xB0
 
+#ifdef DEBUGGING_OUTPUT
+#define DEBUGGING_MESSAGE( format_data... ) fprintf( stderr, format_data )
+#else
+#define DEBUGGING_MESSAGE( format_data... ) 
+#endif
+
 /* ----------------------------------------------------   
    Plumbing
    ---------------------------------------------------- */
@@ -344,6 +350,7 @@ int global_register_auto_update_handler(
     ) {
 
     const char *type = &argv[0]->s, *returl = &argv[1]->s, *retpath = &argv[2]->s;
+    DEBUGGING_MESSAGE( "global_register_auto_update_handler %s %s %s\n", type, returl, retpath );
     generic_register_auto_update( type, returl, retpath );
     return 0;
 }
@@ -358,6 +365,7 @@ int global_unregister_auto_update_handler(
     ) {
 
     const char *type = &argv[0]->s, *returl = &argv[1]->s, *retpath = &argv[2]->s;
+    DEBUGGING_MESSAGE( "global_unregister_auto_update_handler %s %s %s\n", type, returl, retpath );
     generic_unregister_auto_update( type, returl, retpath );
     return 0;
 }
@@ -392,6 +400,7 @@ int loop_register_auto_update_handler(
     char pathtemp[100];
     strcpy( pathtemp, path );
     char *name = extract_loop_name_from_path( pathtemp );
+    DEBUGGING_MESSAGE( "loop_register_auto_update_handler %s %s %s\n", name, returl, retpath );
     generic_register_auto_update( name, returl, retpath );
 
     return 0;
@@ -410,6 +419,7 @@ int loop_unregister_auto_update_handler(
     char pathtemp[100];
     strcpy( pathtemp, path );
     char *name = extract_loop_name_from_path( pathtemp );
+    DEBUGGING_MESSAGE( "loop_unregister_auto_update_handler %s %s %s\n", name, returl, retpath );
     generic_unregister_auto_update( name, returl, retpath );
 
     return 0;
@@ -424,6 +434,7 @@ int quit_handler(
         void *user_data
     ) {
 
+    DEBUGGING_MESSAGE( "quit_handler\n" );
     pthread_mutex_lock( &done_lock );
     done = 1;
     pthread_mutex_unlock( &done_lock );
@@ -441,16 +452,19 @@ int ping_handler(
     ) {
 
     const char *returl = &argv[0]->s, *retpath = &argv[1]->s;
+    DEBUGGING_MESSAGE( "ping_handler %s %s\n", returl, retpath );
     lo_address addr = find_or_cache_addr( returl );
     if( addr ) {
+        char *server_url;
         int send = lo_send(
             addr,
             retpath,
             "ssi",
-            lo_server_thread_get_url( server_thread ),
+            ( server_url = lo_server_thread_get_url( server_thread ) ),
             PACKAGE_VERSION,
             g_hash_table_size( loop_table )
         );
+        free( server_url );
 
         if ( send < 0) {
             fprintf(
@@ -483,6 +497,7 @@ int loop_list_handler(
     ) {
 
     const char *returl = &argv[0]->s, *retpath = &argv[1]->s;
+    DEBUGGING_MESSAGE( "loop_list_handler %s %s\n", returl, retpath );
     lo_address addr = find_or_cache_addr( returl );
     if( addr ) {
         struct where_to send_data = {
@@ -505,7 +520,7 @@ void serialize_loop_controls( char *out, Loop loop )
     );
 }
 
-int loop_get_controls(
+int loop_get_controls_handler(
         const char *path,
         const char *types,
         lo_arg **argv,
@@ -519,6 +534,7 @@ int loop_get_controls(
     char pathtemp[100];
     strcpy( pathtemp, path );
     char *name = extract_loop_name_from_path( pathtemp ); 
+    DEBUGGING_MESSAGE( "loop_get_controls_handler %s %s %s\n", name, returl, retpath );
     Loop loop = g_hash_table_lookup( loop_table, name );
     if( loop ) {
         char serialization[100];
@@ -534,7 +550,7 @@ int loop_get_controls(
     return 0;
 }
 
-int loop_set_controls(
+int loop_set_controls_handler(
         const char *path,
         const char *types,
         lo_arg **argv,
@@ -548,6 +564,7 @@ int loop_set_controls(
     char pathtemp[100];
     strcpy( pathtemp, path );
     char *name = extract_loop_name_from_path( pathtemp ); 
+    DEBUGGING_MESSAGE( "loop_set_controls_handler %s %s\n", name, new_controls );
     Loop loop = g_hash_table_lookup( loop_table, name );
     if( loop ) {
         char controltemp[100];
@@ -587,6 +604,7 @@ int loop_add_handler(
     ) {
 
     const char *name = &argv[0]->s;
+    DEBUGGING_MESSAGE( "loop_add_handler %s\n", name );
 
     pthread_mutex_lock( &loop_table_lock );
 
@@ -614,14 +632,14 @@ int loop_add_handler(
             server_thread,
             ctrl_get_url,
             "ss",
-            loop_get_controls,
+            loop_get_controls_handler,
             NULL
         );
         lo_server_thread_add_method(
             server_thread,
             ctrl_set_url,
             "s",
-            loop_set_controls,
+            loop_set_controls_handler,
             NULL
         );
         lo_server_thread_add_method(
@@ -656,6 +674,7 @@ int loop_del_handler(
     ) {
 
     const char *name = &argv[0]->s;
+    DEBUGGING_MESSAGE( "loop_del_handler %s\n", name );
 
     pthread_mutex_lock( &loop_table_lock );
 
@@ -811,6 +830,7 @@ int midi_binding_list_handler(
     ) {
 
     const char *returl = &argv[0]->s, *retpath = &argv[1]->s;
+    DEBUGGING_MESSAGE( "midi_binding_list_handler %s %s\n", returl, retpath );
     lo_address addr = find_or_cache_addr( returl );
     if( addr ) {
         struct where_to send_data = {
@@ -832,6 +852,7 @@ int clear_midi_bindings_handler(
         void *user_data
     ) {
 
+    DEBUGGING_MESSAGE( "clear_midi_bindings_handler\n" );
     control_action_table_clear_mappings( action_table );
     return 0;
 }
@@ -846,6 +867,7 @@ int add_mapping_handler(
     ) {
 
     const char *serialization = &argv[0]->s;
+    DEBUGGING_MESSAGE( "add_mapping_handler with %s\n", serialization );
     unsigned char midi_channel, midi_value;
     enum MidiControlType midi_type;
     Loop loop;
@@ -882,6 +904,7 @@ int remove_mapping_handler(
     ) {
 
     const char *serialization = &argv[0]->s;
+    DEBUGGING_MESSAGE( "remove_mapping_handler with %s\n", serialization );
     unsigned char midi_channel, midi_value;
     enum MidiControlType midi_type;
     Loop loop;
@@ -930,6 +953,11 @@ void init_liblo( const char *osc_port )
     );
 
     server_thread = lo_server_thread_new( osc_port, osc_error );
+    fprintf(
+        stderr,
+        "Looper engine serving via OSC on port %d\n",
+        lo_server_thread_get_port( server_thread )
+    );
 
     lo_server_thread_add_method( server_thread, "/quit", "", quit_handler, NULL );
     lo_server_thread_add_method( server_thread, "/ping", "ss", ping_handler, NULL );
@@ -948,6 +976,8 @@ void init_liblo( const char *osc_port )
     lo_server_thread_add_method( server_thread, "/clear_midi_bindings", "", clear_midi_bindings_handler, NULL );
     lo_server_thread_add_method( server_thread, "/add_midi_binding", "s", add_mapping_handler, NULL );
     lo_server_thread_add_method( server_thread, "/remove_midi_binding", "s", remove_mapping_handler, NULL );
+    
+    lo_server_thread_start( server_thread );
 }
 
 void close_liblo( void )
@@ -956,6 +986,7 @@ void close_liblo( void )
     g_hash_table_destroy( lo_address_table );
     g_hash_table_foreach( update_table, free_update_list, NULL );
     g_hash_table_destroy( update_table );
+    lo_server_thread_free( server_thread );
 }
 
 /* ----------------------------------------------------   
@@ -965,6 +996,7 @@ void close_liblo( void )
 int main( int argc, char *argv[] )
 {
     fprintf( stdout, "%s\n", PACKAGE_STRING );
+    DEBUGGING_MESSAGE( "Compiled with debugging messages.\n" );
 
     int opt;
     const char *osc_port = NULL;

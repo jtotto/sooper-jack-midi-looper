@@ -18,9 +18,9 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
         #self.loopListView.setModel( 
 
         self.loopUpdated.connect(
-            self.loop_update_handler, type=Qt.QueuedConnection )
+            self._loop_update_handler, type=QtCore.Qt.QueuedConnection )
         self.mappingUpdated.connect(
-            self.mapping_update_handler, type=Qt.QueuedConnection )
+            self._mapping_update_handler, type=QtCore.Qt.QueuedConnection )
         self._engine_manager.subscribe( "loops", self.signal_loop_update )
         self._engine_manager.subscribe( "mappings", self.signal_mapping_update )
 
@@ -71,7 +71,7 @@ class MainApplicationWrapper( object ):
             action="store_true" )
         parser.add_argument( "-q", "--no-quit",
             help="If set, do not issue a quit command to the engine on exit.",
-            action="store_true" )
+            action="store_false" )
             
         parsed_args, unknown = parser.parse_known_args()
 
@@ -80,15 +80,16 @@ class MainApplicationWrapper( object ):
             parsed_args.gui_port, parsed_args.fail_on_engine_not_found, parsed_args.no_quit )
 
         self._ui = _LooperWindow( self._engine_manager, self.package, self.version )
-        self._engine_manager.subscribe( "loops", _LooperWindow.loop_update )
-        self._engine_manager.subscribe( "mappings", _LooperWindow.mapping_update )
+        self._engine_manager.subscribe( "loops", _LooperWindow.signal_loop_update )
+        self._engine_manager.subscribe( "mappings", _LooperWindow.signal_mapping_update )
         self._engine_manager.initialize_subscribers()
 
-        self._app.aboutToQuit().connect( self._cleanup )
+        self._app.aboutToQuit.connect( self._cleanup )
 
     def _cleanup( self ):
         self._engine_manager.cleanup()
 
     def run( self ):
+        import sys
         self._ui.show()
         sys.exit( self._app.exec_() )

@@ -25,3 +25,4 @@ autom4te.cache/
 *.o
 jack_midi_looper
 jmlgui
+*.swp

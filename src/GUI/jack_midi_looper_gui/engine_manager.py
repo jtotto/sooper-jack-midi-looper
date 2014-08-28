@@ -154,16 +154,17 @@ class EngineManager( IEngineManager ):
                 raise EngineManager.NoEngineError
             subprocess.Popen( ["jack_midi_looper", "-p", str( engine_port )] )
             self._engine_address = liblo.Address( "localhost", engine_port )
+            time.sleep( 0.3 ) # Maybe a bit hacky...
             liblo.send( self._engine_address, "/ping", self._server_thread.get_url(),
                 "/pingack" )
-            time.sleep( 0.3 )
+            time.sleep( 0.7 )
 
             self._pingack_lock.acquire()
             if not self._received_pingack:
-                self._pingack_lock.release()
                 raise EngineManager.NoEngineError
+            self._pingack_lock.release()
 
-    def initialize_subscribers():
+    def initialize_subscribers( self ):
         """
         Requests that the engine send us update information necessary to bring us up
         to its current state.
@@ -182,7 +183,7 @@ class EngineManager( IEngineManager ):
         Conclude interaction with the engine by unsubscribing and potentially
         quitting.
         """
-        if quit_on_shutdown:
+        if self._quit_on_shutdown:
             liblo.send( self._engine_address, "/quit" )
         else:
             liblo.send( self._engine_address, "/unregister_auto_update", "loops",
@@ -190,7 +191,7 @@ class EngineManager( IEngineManager ):
             liblo.send( self._engine_address, "/unregister_auto_update", "mappings",
                 self._server_thread.get_url(), "/mapping/update" )
 
-    def _pingack_callback( path, args ):
+    def _pingack_callback( self, path, args ):
         host_url, version, loopcount = args
         print( "Received pingack from engine on host {0} running version {1}."
             .format( host_url, version ) )
@@ -200,10 +201,10 @@ class EngineManager( IEngineManager ):
         self._received_pingack = True
         self._pingack_lock.release()
 
-    def _loop_change_callback( path, args ):
+    def _loop_change_callback( self, path, args ):
         self.notify( "loops", args )
 
-    def _mapping_change_callback( path, args ):
+    def _mapping_change_callback( self, path, args ):
         self.notify( "mappings", args )
 
     class NoEngineError( Exception ):

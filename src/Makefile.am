@@ -1,9 +1,11 @@
 SUBDIRS = GUI
 
+AM_CFLAGS = $(CFLAGS)
+
 bin_PROGRAMS = jack_midi_looper
 
-jack_midi_looper_CFLAGS = -Wall -std=c99 $(JACK_CFLAGS) $(GLIB_CFLAGS) $(LIBLO_CFLAGS)
-jack_midi_looper_LDADD = $(JACK_LIBS) $(GLIB_LIBS) $(LIBLO_LIBS)
+jack_midi_looper_CFLAGS = -Wall -std=c99 $(JACK_CFLAGS) $(GLIB_CFLAGS) $(LIBLO_CFLAGS) $(PTHREAD_CFLAGS)
+jack_midi_looper_LDADD = $(JACK_LIBS) $(GLIB_LIBS) $(LIBLO_LIBS) $(PTHREAD_LIBS)
 jack_midi_looper_SOURCES = \
     looper.c \
     loop.h \
