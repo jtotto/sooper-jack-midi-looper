@@ -1,13 +1,15 @@
 import argparse
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog
 from jack_midi_looper_gui.engine_manager import IEngineManagerFactory
-from PyQt5 import QtCore
-from PyQt5.QtWidgets import QApplication, QMainWindow
 from jack_midi_looper_gui.Ui_MainWindow import Ui_MainWindow
+from jack_midi_looper_gui.Ui_MappingDialog import Ui_MappingDialog
+from jack_midi_looper_gui.models import LoopListModel, MappingTableModel, MIDIMappingInfo
 
 class _LooperWindow( QMainWindow, Ui_MainWindow ):
 
-    loopUpdated = QtCore.pyqtSignal()
-    mappingUpdated = QtCore.pyqtSignal()
+    loopUpdated = QtCore.pyqtSignal( str, str )
+    mappingUpdated = QtCore.pyqtSignal( str, MIDIMappingInfo )
 
     def __init__( self, engine_manager, package, version ):
         super( QMainWindow, self ).__init__()
@@ -15,8 +17,15 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
         self.setupUi( self )
         self.setWindowTitle( "{0} v{1}".format( package, version ) )
 
-        #self.loopListView.setModel( 
+        self.loopListViewModel = LoopListModel()
+        self.loopListView.setModel( self.loopListViewModel )
 
+        self.mappingTableViewModel = MappingTableModel()
+        self.mappingTableView.setModel( self.mappingTableViewModel )
+        tableHeader = self.mappingTableView.horizontalHeader()
+        tableHeader.setSectionResizeMode( QtWidgets.QHeaderView.Stretch )
+
+        # Only update the model on the GUI thread - thread-safe.
         self.loopUpdated.connect(
             self._loop_update_handler, type=QtCore.Qt.QueuedConnection )
         self.mappingUpdated.connect(
@@ -31,23 +40,75 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
         self.mappingUpdated.emit( change, data )
 
     def _loop_update_handler( self, change, data ):
-        pass
+        if change == "add":
+            self.loopListViewModel.insertRow( self.loopListViewModel.rowCount() )
+            self.loopListViewModel.setData(
+                self.loopListViewModel.createIndex(
+                    self.loopListViewModel.rowCount() - 1, 0 ), data )
+        elif change == "remove":
+            self.loopListViewModel.removeLoop( data )
+        else:
+            raise ValueError( "Invalid loop update!" )
 
     def _mapping_update_handler( self, change, data ):
-        pass
+        if change == "add":
+            self.mappingTableViewModel.insertRow( self.loopListViewModel.rowCount() )
+            for i in range( MappingTable.COLUMN_CHANNEL, MappingTable.COLUMN_ACTION ):
+                self.mappingTableViewModel.setData(
+                    self.mappingTableViewModel.createIndex(
+                        self.mappingTableViewModel.rowCount() - 1, i ), data[i] )
+        elif change == "remove":
+            self.mappingTableViewModel.removeMapping( data )
+        else:
+            raise ValueError( "Invalid mapping update!" )
 
     # Slots are named in camelcase for consistency with the rest of Qt.
     def newLoop( self ):
-        pass
+        new_loop_name, ok = QtWidgets.QInputDialog.getText( self, "New Loop",
+            "Provide the name for the new loop." )
+        if ok:
+            self._engine_manager.new_loop( new_loop_name )
 
     def removeLoops( self ):
-        pass
+        # Gets the names because a normal iterative removal would invalidate the
+        # index list at each step.  This is not particularly efficient.
+        selected = [self.loopListViewModel.data( x ) for x in
+            self.loopListView.selectedIndexes()]
+        self._engine_manager.remove_loops( selected )
 
     def newMapping( self ):
-        pass
+        loops = [
+            self.loopListViewModel.data( self.loopListViewModel.createIndex( x, 0 ) )
+                for x in range( 0, self.loopListViewModel.rowCount() ) ]
+
+        if not loops:
+            QtWidgets.QMessageBox.warning( self, "No loops",
+                "You must add a loop before defining mappings." )
+            return
+
+        mapping_dialog = _MappingDialog( loops, self )
+        if mapping_dialog.exec_():
+            channel, midi_type, value, name, action = mapping_dialog.getMappingData()
+            self._engine_manager.new_mapping(
+                MIDIMappingInfo( channel, midi_type, value, name, action ) )
 
     def removeMappings( self ):
-        pass
+        mappings = [self.mappingTableViewModel.dataRow( x )
+            for x in self.mappingTableView.selectionModel().selectedRows()]
+        self._engine_manager.remove_mappings( mappings )
+
+class _MappingDialog( QDialog, Ui_MappingDialog ):
+    def __init__( self, loops, parent=None ):
+        super( QDialog, self ).__init__( parent )
+        self.setupUi( self )
+
+        self.comboBox_loop.clear()
+        self.comboBox_loop.addItems( loops )
+
+    def getMappingData( self ):
+        return ( self.spinBox_channel.value() - 1, str( self.comboBox_type.currentText() ),
+            self.spinBox_midi_value.value(),  str( self.comboBox_loop.currentText() ),
+            str( self.comboBox_action.currentText() ) )
 
 class MainApplicationWrapper( object ):
     def __init__( self, *args, **kwargs ):
@@ -80,8 +141,6 @@ class MainApplicationWrapper( object ):
             parsed_args.gui_port, parsed_args.fail_on_engine_not_found, parsed_args.no_quit )
 
         self._ui = _LooperWindow( self._engine_manager, self.package, self.version )
-        self._engine_manager.subscribe( "loops", _LooperWindow.signal_loop_update )
-        self._engine_manager.subscribe( "mappings", _LooperWindow.signal_mapping_update )
         self._engine_manager.initialize_subscribers()
 
         self._app.aboutToQuit.connect( self._cleanup )

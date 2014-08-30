@@ -1,4 +1,5 @@
 import liblo
+from jack_midi_looper_gui.models import MIDIMappingInfo
 from jack_midi_looper_gui.subject import Subject
 import subprocess
 import threading
@@ -7,15 +8,7 @@ import time
 class IEngineManager( Subject ):
     """Interface for the engine manager."""
     def __init__( self ):
-        """
-        Constructs an engine manager using the given handlers.
-
-        Args:
-            loop_change_handler ((void)(str,str)): The callback to invoke when
-                notified by the engine of loop changes.
-            mapping_change_handler ((void)(str,str)): The callback to invoke when
-            notified by the engine of MIDI mapping changes.
-        """
+        """Constructs an engine manager with the given subscription keys."""
         Subject.__init__( self )
         self.add_key( "loops" )
         self.add_key( "mappings" )
@@ -31,7 +24,7 @@ class IEngineManager( Subject ):
         change_type, change_content = data
         callback( change_type, change_content )
 
-    def initialize_subscribers():
+    def initialize_subscribers( self ):
         """Retrieve the initial state of the engine."""
         raise NotImplementedError
 
@@ -43,7 +36,7 @@ class IEngineManager( Subject ):
         """
         Requests that the engine create a new loop.
         
-        Args:k
+        Args:
             name (str): A string containing the name of the loop to be created.
 
         Returns:
@@ -164,6 +157,9 @@ class EngineManager( IEngineManager ):
                 raise EngineManager.NoEngineError
             self._pingack_lock.release()
 
+    class NoEngineError( Exception ):
+        pass
+
     def initialize_subscribers( self ):
         """
         Requests that the engine send us update information necessary to bring us up
@@ -204,9 +200,63 @@ class EngineManager( IEngineManager ):
     def _loop_change_callback( self, path, args ):
         self.notify( "loops", args )
 
+    type_serializations = {
+        "Note On":"on",
+        "Note Off":"off",
+        "CC On":"cc_on",
+        "CC Off":"cc_off"
+    }
+    type_deserializations = {
+        "on":"Note On",
+        "off":"Note Off",
+        "cc_on":"CC On",
+        "cc_off":"CC Off"
+    }
+    action_serializations = {
+        "Toggle Playback":"toggle_playback",
+        "Toggle Recording":"toggle_recording"
+    }
+    action_deserializations = {
+        "toggle_playback":"Toggle Playback",
+        "toggle_recording":"Toggle Recording"
+    }
+
+    @staticmethod
+    def _serialize_mapping( mapping_info ):
+        return "{0} {1} {2} {3} {4}".format( mapping_info.channel,
+            EngineManager.type_serializations[mapping_info.midi_type], mapping_info.value,
+            EngineManager.action_serializations[mapping_info.loop_action], mapping_info.loop_name )
+
+    @staticmethod
+    def _deserialize_mapping( mapping_serialization ):
+        data = mapping_serialization.split( " " )
+        channel = int( data[0] )
+        midi_type = EngineManager.type_deserializations[data[1]]
+        value = int( data[2] )
+        loop_action = EngineManager.action_deserializations[data[3]]
+        loop_name = data[4]
+        
+        return MIDIMappingInfo( channel, midi_type, value, loop_name, loop_action )
+
     def _mapping_change_callback( self, path, args ):
-        self.notify( "mappings", args )
+        change, serialization = args
+        deserialized = ( change, self._deserialize_mapping( serialization ) )
+        self.notify( "mappings", deserialized )
 
-    class NoEngineError( Exception ):
-        pass
+    def new_loop( self, name ):
+        liblo.send( self._engine_address, "/loop_add", name )
 
+    def remove_loops( self, names ):
+        for name in names:
+            liblo.send( self._engine_address, "/loop_del", name )
+
+    def new_mapping( self, mapping_info ):
+        serialization = self._serialize_mapping( mapping_info )
+        liblo.send( self._engine_address, "add_midi_binding", serialization )
+
+    def remove_mappings( self, mapping_infos ):
+        for info in mapping_infos:
+            serialization = self._serialize_mapping( info )
+            liblo.send( self._engine_address, "remove_midi_binding", serialization )
+            
+        

@@ -80,6 +80,11 @@ jack_port_t *control_input;
 jack_nframes_t sample_rate;
 int rate_flag = 0;
 
+pthread_mutex_t loop_table_lock;
+pthread_mutex_t action_table_lock;
+GHashTable *loop_table;
+ControlActionTable action_table;
+
 int sample_rate_change( jack_nframes_t nframes, void *notUsed )
 {
     if( !rate_flag ) {
@@ -89,6 +94,13 @@ int sample_rate_change( jack_nframes_t nframes, void *notUsed )
 
     printf( "Sample rate has changed! Exiting...\n" );
     exit( -1 );
+}
+
+void process_for_each_loop( gpointer key, gpointer value, gpointer data )
+{
+    Loop loop = value;
+    jack_nframes_t *nframes = data;
+    loop_process_callback( loop, *nframes );
 }
 
 void process_control_input( jack_nframes_t nframes )
@@ -104,14 +116,54 @@ void process_control_input( jack_nframes_t nframes )
 
     events = jack_midi_get_event_count( control_port_buffer );
 
-    int i;
-    for ( i = 0; i < events; i++ ) {
-        struct MidiMessage rev;
+    if(
+        pthread_mutex_trylock( &loop_table_lock ) == 0
+        && pthread_mutex_trylock( &action_table_lock ) == 0
+    ) {
+        int i;
+        for ( i = 0; i < events; i++ ) {
+            struct MidiMessage rev;
 
-        if( midi_message_from_port_buffer( &rev, control_port_buffer, i ) != 0 ) {
-            fprintf( stderr, "TROUBLE\n" );
+            if( midi_message_from_port_buffer( &rev, control_port_buffer, i ) != 0 ) {
+                fprintf( stderr, "TROUBLE\n" );
+            }
+            unsigned char midi_channel, midi_value;
+            enum MidiControlType midi_type;
+            unsigned char message_type = rev.data[0] & 0xf0;
+            if(
+                message_type == NOTE_ON
+                || message_type == NOTE_OFF
+                || message_type == CONTROL_CHANGE
+            ) {
+                midi_value = rev.data[1];
+                midi_channel = rev.data[0] & 0xf;
+
+                switch( message_type ) {
+                    case NOTE_ON: midi_type = TYPE_NOTE_ON; break;
+                    case NOTE_OFF: midi_type = TYPE_NOTE_OFF; break;
+                    case CONTROL_CHANGE: midi_type = rev.data[2] > 63 ? TYPE_CC_ON : TYPE_CC_OFF; break;
+                    default:
+                        // shut gcc up
+                        midi_type = TYPE_NOTE_ON;
+                        assert( 0 );
+                        break;
+                }
+
+                control_action_table_invoke(
+                    action_table,
+                    midi_channel,
+                    midi_type,
+                    midi_value,
+                    rev.time
+                );
+            }
         }
 
+        g_hash_table_foreach( loop_table, process_for_each_loop, &nframes );
+        pthread_mutex_unlock( &loop_table_lock );
+        pthread_mutex_unlock( &action_table_lock );
+    } else {
+        DEBUGGING_MESSAGE( "Tables locked, no output.\n" );
     }
 
 }
@@ -165,12 +217,6 @@ void close_jack( void )
 /* ----------------------------------------------------   
    Loops/Mappings
    ---------------------------------------------------- */
-
-// Data.
-pthread_mutex_t loop_table_lock;
-pthread_mutex_t action_table_lock;
-GHashTable *loop_table;
-ControlActionTable action_table;
 
 void loop_free_wrapper( gpointer data )
 {
@@ -372,6 +418,7 @@ int global_unregister_auto_update_handler(
 
 void auto_update( const char *type, const char *change, const char *data )
 {
+    DEBUGGING_MESSAGE( "auto_update %s %s %s\n", type, change, data );
     gpointer value;
     gboolean valid_update
         = g_hash_table_lookup_extended( update_table, type, NULL, &value );
@@ -611,6 +658,7 @@ int loop_add_handler(
     // Checks the update table to prohibit the use of special names.
     if(
         strstr( name, "/" ) == NULL
+        && strstr( name, " " ) == NULL
         && strlen( name ) < 50
         && !g_hash_table_contains( update_table, name )
     ) {
@@ -882,6 +930,9 @@ int add_mapping_handler(
         &control_func
     );
 
+    pthread_mutex_lock( &loop_table_lock );
+    pthread_mutex_lock( &action_table_lock );
+
     control_action_table_insert(
         action_table,
         midi_channel,
@@ -890,6 +941,11 @@ int add_mapping_handler(
         loop,
         control_func
     );
+
+    auto_update( "mappings", "add", serialization );
+
+    pthread_mutex_unlock( &action_table_lock );
+    pthread_mutex_unlock( &loop_table_lock );
 
     return 0;
 }
@@ -919,6 +975,9 @@ int remove_mapping_handler(
         &control_func
     );
 
+    pthread_mutex_lock( &loop_table_lock );
+    pthread_mutex_lock( &action_table_lock );
+
     control_action_table_remove(
         action_table,
         midi_channel,
@@ -927,6 +986,11 @@ int remove_mapping_handler(
         loop,
         control_func
     );
+
+    auto_update( "mappings", "remove", serialization );
+
+    pthread_mutex_unlock( &action_table_lock );
+    pthread_mutex_unlock( &loop_table_lock );
 
     return 0;
 }

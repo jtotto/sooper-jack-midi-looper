@@ -66,7 +66,7 @@ class Subject( object ):
             void
         """
         for callback in self._observers[key]:
-            perform_notify( key, callback, data )
+            self.perform_notify( key, callback, data )
 
     @staticmethod
     def perform_notify( key, callback, data ):
