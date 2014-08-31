@@ -1,4 +1,5 @@
 import argparse
+import logging
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog
 from jack_midi_looper_gui.engine_manager import IEngineManagerFactory
@@ -52,11 +53,11 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
 
     def _mapping_update_handler( self, change, data ):
         if change == "add":
-            self.mappingTableViewModel.insertRow( self.loopListViewModel.rowCount() )
-            for i in range( MappingTable.COLUMN_CHANNEL, MappingTable.COLUMN_ACTION ):
+            self.mappingTableViewModel.insertRow( self.mappingTableViewModel.rowCount() )
+            for i in range( MappingTableModel.COLUMN_CHANNEL, MappingTableModel.COLUMN_ACTION ):
                 self.mappingTableViewModel.setData(
-                    self.mappingTableViewModel.createIndex(
-                        self.mappingTableViewModel.rowCount() - 1, i ), data[i] )
+                    self.mappingTableViewModel.createIndex( self.mappingTableViewModel.rowCount() - 1, i ),
+                    MappingTableModel.get_mapping_property( data, i ) )
         elif change == "remove":
             self.mappingTableViewModel.removeMapping( data )
         else:
@@ -116,6 +117,9 @@ class MainApplicationWrapper( object ):
         for key in kwargs:
             setattr( self, key, kwargs[key] )
         self._app = QApplication( sys.argv )
+
+        logging.basicConfig( level=self.log_level )
+        logging.info( "Built with logging level info." )
 
         parser = argparse.ArgumentParser( description="GUI for jack_midi_looper" )
         parser.add_argument( "-e", "--engine-host",

@@ -1,4 +1,5 @@
 import liblo
+import logging
 from jack_midi_looper_gui.models import MIDIMappingInfo
 from jack_midi_looper_gui.subject import Subject
 import subprocess
@@ -126,6 +127,7 @@ class EngineManager( IEngineManager ):
         self._server_thread.add_method(
             "/mapping/update", "ss", self._mapping_change_callback )
         self._server_thread.start()
+        print( "GUI OSC Server at {0}".format( self._server_thread.get_url() ) )
         self._received_pingack = False
         self._pingack_lock = threading.Lock()
 
@@ -198,6 +200,9 @@ class EngineManager( IEngineManager ):
         self._pingack_lock.release()
 
     def _loop_change_callback( self, path, args ):
+        logging.info( "loop change callback" )
+        for arg in args:
+            logging.info( "    %s", arg )
         self.notify( "loops", args )
 
     type_serializations = {
@@ -239,6 +244,9 @@ class EngineManager( IEngineManager ):
         return MIDIMappingInfo( channel, midi_type, value, loop_name, loop_action )
 
     def _mapping_change_callback( self, path, args ):
+        logging.info( "mapping change callback" )
+        for arg in args:
+            logging.info( "    %s", arg )
         change, serialization = args
         deserialized = ( change, self._deserialize_mapping( serialization ) )
         self.notify( "mappings", deserialized )
@@ -252,11 +260,11 @@ class EngineManager( IEngineManager ):
 
     def new_mapping( self, mapping_info ):
         serialization = self._serialize_mapping( mapping_info )
-        liblo.send( self._engine_address, "add_midi_binding", serialization )
+        liblo.send( self._engine_address, "/add_midi_binding", serialization )
 
     def remove_mappings( self, mapping_infos ):
         for info in mapping_infos:
             serialization = self._serialize_mapping( info )
-            liblo.send( self._engine_address, "remove_midi_binding", serialization )
+            liblo.send( self._engine_address, "/remove_midi_binding", serialization )
             
         

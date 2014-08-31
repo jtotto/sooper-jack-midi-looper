@@ -99,31 +99,31 @@ class MappingTableModel( QAbstractTableModel ):
 
     # Is there an idiomatic Python way of doing this?
     @staticmethod
-    def _get_mapping_property( info, column ):
-        if column == COLUMN_CHANNEL:
+    def get_mapping_property( info, column ):
+        if column == MappingTableModel.COLUMN_CHANNEL:
             return info.channel
-        elif column == COLUMN_TYPE:
+        elif column == MappingTableModel.COLUMN_TYPE:
             return info.midi_type
-        elif column == COLUMN_VALUE:
+        elif column == MappingTableModel.COLUMN_VALUE:
             return info.value
-        elif column == COLUMN_LOOP_NAME:
+        elif column == MappingTableModel.COLUMN_LOOP_NAME:
             return info.loop_name
-        elif column == COLUMN_ACTION:
+        elif column == MappingTableModel.COLUMN_ACTION:
             return info.loop_action
         else:
             raise ValueError( "Invalid column." )
 
     @staticmethod
-    def _set_mapping_property( info, column, data ):
-        if column == COLUMN_CHANNEL:
+    def set_mapping_property( info, column, data ):
+        if column == MappingTableModel.COLUMN_CHANNEL:
             info.channel = data
-        elif column == COLUMN_TYPE:
+        elif column == MappingTableModel.COLUMN_TYPE:
             info.midi_type = data
-        elif column == COLUMN_VALUE:
+        elif column == MappingTableModel.COLUMN_VALUE:
             info.value = data
-        elif column == COLUMN_LOOP_NAME:
+        elif column == MappingTableModel.COLUMN_LOOP_NAME:
             info.loop_name = data
-        elif column == COLUMN_ACTION:
+        elif column == MappingTableModel.COLUMN_ACTION:
             info.loop_action = data
         else:
             raise ValueError( "Invalid column." )
@@ -142,7 +142,7 @@ class MappingTableModel( QAbstractTableModel ):
         if ( index.row() < len( self._data_model )
             and index.column() < self.COLUMN_COUNT ):
             
-            return _get_mapping_property(
+            return MappingTableModel.get_mapping_property(
                 self._data_model[index.row()], index.column() )
 
         return None
@@ -164,7 +164,8 @@ class MappingTableModel( QAbstractTableModel ):
 
             return False
 
-        self._set_mapping_property(
+        print( index.row(), len( self._data_model ) )
+        MappingTableModel.set_mapping_property(
             self._data_model[index.row()], index.column(), value )
         self.dataChanged.emit( index, index, () )
         return True

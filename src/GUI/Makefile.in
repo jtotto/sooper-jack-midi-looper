@@ -223,6 +223,7 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 JACK_CFLAGS = @JACK_CFLAGS@
 JACK_LIBS = @JACK_LIBS@
+JML_LOG_LEVEL = @JML_LOG_LEVEL@
 LDFLAGS = @LDFLAGS@
 LIBLO_CFLAGS = @LIBLO_CFLAGS@
 LIBLO_LIBS = @LIBLO_LIBS@
@@ -304,7 +305,8 @@ CLEANFILES = $(bin_SCRIPTS)
 EXTRA_DIST = looper_gui.in
 do_substitution = sed -e 's,[@]pythondir[@],$(pythondir),g' \
     -e 's,[@]PACKAGE[@],$(PACKAGE),g' \
-    -e 's,[@]VERSION[@],$(VERSION),g'
+    -e 's,[@]VERSION[@],$(VERSION),g' \
+    -e 's,[@]LOG_LEVEL[@],@JML_LOG_LEVEL@,g'
 
 all: all-recursive
 

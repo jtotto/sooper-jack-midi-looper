@@ -357,7 +357,7 @@ void generic_register_auto_update(
         new_subscriber->addr = find_or_cache_addr( returl );
         new_subscriber->retpath = homebrew_strdup( retpath );
         list = g_list_prepend( list, new_subscriber );
-        g_hash_table_replace( update_table, (gpointer)key, list );
+        g_hash_table_insert( update_table, (gpointer)key, list );
     }
 }
 
@@ -382,7 +382,7 @@ void generic_unregister_auto_update(
             free_update_item( subscriber->data );
             list = g_list_remove_link( list, subscriber );
         }
-        g_hash_table_replace( update_table, (gpointer)key, list );
+        g_hash_table_insert( update_table, (gpointer)key, list );
     }
 }
 
@@ -427,10 +427,13 @@ void auto_update( const char *type, const char *change, const char *data )
         GList *subscribers = value;
         while( subscribers != NULL ) {
             struct where_to *update_data = subscribers->data;
+            DEBUGGING_MESSAGE( "    %p %s\n", update_data->addr, update_data->retpath );
             send_update_data( change, data, update_data );
 
             subscribers = subscribers->next;
         }
+    } else {
+        DEBUGGING_MESSAGE( "INVALID UPDATE %s\n", type );
     }
 }
 
@@ -941,8 +944,6 @@ int add_mapping_handler(
         loop,
         control_func
     );
-
-    auto_update( "mappings", "add", serialization );
 
     pthread_mutex_unlock( &action_table_lock );
     pthread_mutex_unlock( &loop_table_lock );

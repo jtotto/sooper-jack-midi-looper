@@ -6,7 +6,8 @@ EXTRA_DIST = looper_gui.in
 
 do_substitution = sed -e 's,[@]pythondir[@],$(pythondir),g' \
     -e 's,[@]PACKAGE[@],$(PACKAGE),g' \
-    -e 's,[@]VERSION[@],$(VERSION),g'
+    -e 's,[@]VERSION[@],$(VERSION),g' \
+    -e 's,[@]LOG_LEVEL[@],@JML_LOG_LEVEL@,g'
 
 jmlgui: looper_gui.in Makefile
 	$(do_substitution) < $(srcdir)/looper_gui.in > jmlgui
