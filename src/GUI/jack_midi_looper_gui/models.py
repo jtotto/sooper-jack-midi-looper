@@ -11,7 +11,13 @@ class LoopListModel( QAbstractListModel ):
         return len( self._data_model )
 
     def data( self, index, role=QtCore.Qt.DisplayRole ):
-        return self._data_model[index.row()] if index.row() < len( self._data_model ) else None
+        if role == QtCore.Qt.DisplayRole:
+            if index.row() < len( self._data_model ):
+                return self._data_model[index.row()]
+            else:
+                return None
+        else:
+            return QtCore.QVariant()
 
     def removeRow( self, row, parent=QModelIndex() ):
         if row >= len( self._data_model ):
@@ -78,6 +84,11 @@ class MIDIMappingInfo( object ):
 
 class MappingTableModel( QAbstractTableModel ):
     """QAbstractTableModel implementation."""
+    COLUMN_CHANNEL = 0
+    COLUMN_TYPE = 1
+    COLUMN_VALUE = 2
+    COLUMN_LOOP_NAME = 3
+    COLUMN_ACTION = 4
     COLUMNS = ["Channel", "MIDI Type", "MIDI Value", "Loop", "Action"]
 
     def __init__( self ):
@@ -88,16 +99,31 @@ class MappingTableModel( QAbstractTableModel ):
         return len( self._data_model )
 
     def columnCount( self, parent=QModelIndex() ):
-        return self.COLUMN_COUNT
+        return len( self.COLUMNS )
+
+    @staticmethod
+    def get_mapping_property( info, column ):
+        if column == MappingTableModel.COLUMN_CHANNEL:
+            return info.channel
+        elif column == MappingTableModel.COLUMN_TYPE:
+            return info.midi_type
+        elif column == MappingTableModel.COLUMN_VALUE:
+            return info.value
+        elif column == MappingTableModel.COLUMN_LOOP_NAME:
+            return info.loop_name
+        elif column == MappingTableModel.COLUMN_ACTION:
+            return info.loop_action
+        else:
+            raise ValueError( "Invalid column." )
 
     def data( self, index, role=QtCore.Qt.DisplayRole ):
-        if ( index.row() < len( self._data_model )
-            and index.column() < self.COLUMN_COUNT ):
-            
-            return MappingTableModel.get_mapping_property(
-                self._data_model[index.row()], index.column() )
-
-        return None
+        if role == QtCore.Qt.DisplayRole:
+            if ( index.row() < len( self._data_model ) and index.column() < len( self.COLUMNS ) ):
+                return MappingTableModel.get_mapping_property( self._data_model[index.row()], index.column() )
+            else:
+                return None
+        else:
+            return QtCore.QVariant()
 
     def dataRow( self, row ):
         if row < len( self._data_model ):
