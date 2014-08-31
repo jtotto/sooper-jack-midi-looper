@@ -13,17 +13,6 @@ class LoopListModel( QAbstractListModel ):
     def data( self, index, role=QtCore.Qt.DisplayRole ):
         return self._data_model[index.row()] if index.row() < len( self._data_model ) else None
 
-    def setData( self, index, value, role=QtCore.Qt.EditRole ):
-        if index.row() >= len( self._data_model ):
-            return False
-
-        self._data_model[index.row()] = value
-        self.dataChanged.emit( index, index, () )
-        return True
-
-    def flags( self, index ):
-        return QAbstractListModel.flags( self, index ) | QtCore.Qt.ItemIsEditable
-
     def removeRow( self, row, parent=QModelIndex() ):
         if row >= len( self._data_model ):
             return False
@@ -33,12 +22,12 @@ class LoopListModel( QAbstractListModel ):
         self.endRemoveRows()
         return True
         
-    def insertRow( self, row, parent=QModelIndex() ):
+    def insertLoopRow( self, row, loop, parent=QModelIndex() ):
         if row > len( self._data_model ):
             return False
 
         self.beginInsertRows( parent, row, row )
-        self._data_model.insert( row, None )
+        self._data_model.insert( row, loop )
         self.endInsertRows()
         return True
 
@@ -89,44 +78,7 @@ class MIDIMappingInfo( object ):
 
 class MappingTableModel( QAbstractTableModel ):
     """QAbstractTableModel implementation."""
-    COLUMN_CHANNEL = 0
-    COLUMN_TYPE = 1
-    COLUMN_VALUE = 2
-    COLUMN_LOOP_NAME = 3
-    COLUMN_ACTION = 4
-    COLUMN_COUNT = 5
     COLUMNS = ["Channel", "MIDI Type", "MIDI Value", "Loop", "Action"]
-
-    # Is there an idiomatic Python way of doing this?
-    @staticmethod
-    def get_mapping_property( info, column ):
-        if column == MappingTableModel.COLUMN_CHANNEL:
-            return info.channel
-        elif column == MappingTableModel.COLUMN_TYPE:
-            return info.midi_type
-        elif column == MappingTableModel.COLUMN_VALUE:
-            return info.value
-        elif column == MappingTableModel.COLUMN_LOOP_NAME:
-            return info.loop_name
-        elif column == MappingTableModel.COLUMN_ACTION:
-            return info.loop_action
-        else:
-            raise ValueError( "Invalid column." )
-
-    @staticmethod
-    def set_mapping_property( info, column, data ):
-        if column == MappingTableModel.COLUMN_CHANNEL:
-            info.channel = data
-        elif column == MappingTableModel.COLUMN_TYPE:
-            info.midi_type = data
-        elif column == MappingTableModel.COLUMN_VALUE:
-            info.value = data
-        elif column == MappingTableModel.COLUMN_LOOP_NAME:
-            info.loop_name = data
-        elif column == MappingTableModel.COLUMN_ACTION:
-            info.loop_action = data
-        else:
-            raise ValueError( "Invalid column." )
 
     def __init__( self ):
         QAbstractTableModel.__init__( self )
@@ -158,21 +110,6 @@ class MappingTableModel( QAbstractTableModel ):
             return self.COLUMNS[section]
         return QAbstractTableModel.headerData( self, section, orientation, role )
 
-    def setData( self, index, value, role=QtCore.Qt.EditRole ):
-        if ( index.row() >= len( self._data_model ) or
-            index.column() >= self.COLUMN_COUNT ):
-
-            return False
-
-        print( index.row(), len( self._data_model ) )
-        MappingTableModel.set_mapping_property(
-            self._data_model[index.row()], index.column(), value )
-        self.dataChanged.emit( index, index, () )
-        return True
-
-    def flags( self, index ):
-        return QAbstractTableModel.flags( self, index ) | QtCore.Qt.ItemIsEditable
-
     def removeRow( self, row, parent=QModelIndex() ):
         if row >= len( self._data_model ):
             return False
@@ -182,12 +119,12 @@ class MappingTableModel( QAbstractTableModel ):
         self.endRemoveRows()
         return True
         
-    def insertRow( self, row, parent=QModelIndex() ):
+    def insertMappingRow( self, row, info, parent=QModelIndex() ):
         if row > len( self._data_model ):
             return False
 
         self.beginInsertRows( parent, row, row )
-        self._data_model.insert( row, None )
+        self._data_model.insert( row, info )
         self.endInsertRows()
         return True
 

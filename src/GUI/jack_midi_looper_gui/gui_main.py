@@ -42,10 +42,8 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
 
     def _loop_update_handler( self, change, data ):
         if change == "add":
-            self.loopListViewModel.insertRow( self.loopListViewModel.rowCount() )
-            self.loopListViewModel.setData(
-                self.loopListViewModel.createIndex(
-                    self.loopListViewModel.rowCount() - 1, 0 ), data )
+            self.loopListViewModel.insertLoopRow(
+                self.loopListViewModel.rowCount(), data )
         elif change == "remove":
             self.loopListViewModel.removeLoop( data )
         else:
@@ -53,11 +51,8 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
 
     def _mapping_update_handler( self, change, data ):
         if change == "add":
-            self.mappingTableViewModel.insertRow( self.mappingTableViewModel.rowCount() )
-            for i in range( MappingTableModel.COLUMN_CHANNEL, MappingTableModel.COLUMN_ACTION ):
-                self.mappingTableViewModel.setData(
-                    self.mappingTableViewModel.createIndex( self.mappingTableViewModel.rowCount() - 1, i ),
-                    MappingTableModel.get_mapping_property( data, i ) )
+            self.mappingTableViewModel.insertMappingRow(
+                self.mappingTableViewModel.rowCount(), data )
         elif change == "remove":
             self.mappingTableViewModel.removeMapping( data )
         else:
