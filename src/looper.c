@@ -260,7 +260,7 @@ void close_loops( void )
 GHashTable *update_table; // This table does NOT own its keys.
 
 pthread_mutex_t done_lock;
-int done = 0;
+int done = 0, shutting_down = 0;
 
 lo_server_thread server_thread;
 GHashTable *lo_address_table;
@@ -485,9 +485,15 @@ int quit_handler(
     ) {
 
     DEBUGGING_MESSAGE( "quit_handler\n" );
-    pthread_mutex_lock( &done_lock );
-    done = 1;
-    pthread_mutex_unlock( &done_lock );
+
+    if( !shutting_down ) { // Ignore quit messages from other clients after the first one.
+        shutting_down = 1;
+        auto_update( "shutdown", "", "" );
+
+        pthread_mutex_lock( &done_lock );
+        done = 1;
+        pthread_mutex_unlock( &done_lock );
+    }
 
     return 0;
 }
@@ -836,18 +842,20 @@ void mapping_table_change_handler(
         Loop loop,
         LoopControlFunc control_func
     ) {
-    char serialization[100];
-    serialize_mapping(
-        serialization,
-        midi_channel,
-        midi_type,
-        midi_value,
-        loop,
-        control_func
-    );
+    if( !shutting_down ) {
+        char serialization[100];
+        serialize_mapping(
+            serialization,
+            midi_channel,
+            midi_type,
+            midi_value,
+            loop,
+            control_func
+        );
 
-    char *change_string = change == ACTION_ADD ? "add" : "remove";
-    auto_update( "mappings", change_string, serialization );
+        char *change_string = change == ACTION_ADD ? "add" : "remove";
+        auto_update( "mappings", change_string, serialization );
+    }
 }
 
 void send_mapping(
@@ -1031,8 +1039,9 @@ void init_liblo( const char *osc_port )
 
     update_table = g_hash_table_new( g_str_hash, g_str_equal );
     g_hash_table_insert( update_table, "loops", NULL /* the empty GList */ );
-    g_hash_table_insert( update_table, "mappings", NULL /* the empty GList */ );
-    g_hash_table_insert( update_table, "errors", NULL /* the empty GList */ );
+    g_hash_table_insert( update_table, "mappings", NULL );
+    g_hash_table_insert( update_table, "errors", NULL );
+    g_hash_table_insert( update_table, "shutdown", NULL );
 
     lo_server_thread_add_method( server_thread, "/register_auto_update", "sss", global_register_auto_update_handler, NULL );
     lo_server_thread_add_method( server_thread, "/unregister_auto_update", "sss", global_unregister_auto_update_handler, NULL );
@@ -1095,10 +1104,10 @@ int main( int argc, char *argv[] )
     }
 
     // At this point, the engine has been terminated.
-    close_jack();
     close_liblo();
     close_loops();
     control_action_table_free( action_table );
+    close_jack();
     pthread_mutex_destroy( &action_table_lock );
 
     return 0;

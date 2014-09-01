@@ -13,6 +13,7 @@ class IEngineManager( Subject ):
         Subject.__init__( self )
         self.add_key( "loops" )
         self.add_key( "mappings" )
+        self.add_key( "shutdown" )
 
     @staticmethod
     def perform_notify( key, callback, data ):
@@ -22,8 +23,11 @@ class IEngineManager( Subject ):
         There is NO guarantee that the provided callbacks will be invoked from the
         same thread, so they should be written accordingly.
         """
-        change_type, change_content = data
-        callback( change_type, change_content )
+        if key == "shutdown":
+            callback()
+        else: # "loops", "mappings"
+            change_type, change_content = data
+            callback( change_type, change_content )
 
     def initialize_subscribers( self ):
         """Retrieve the initial state of the engine."""
@@ -126,6 +130,8 @@ class EngineManager( IEngineManager ):
             "/loop/update", "ss", self._loop_change_callback )
         self._server_thread.add_method(
             "/mapping/update", "ss", self._mapping_change_callback )
+        self._server_thread.add_method(
+            "/shutdown", "ss", self._shutdown_callback )
         self._server_thread.start()
         print( "GUI OSC Server at {0}".format( self._server_thread.get_url() ) )
         self._received_pingack = False
@@ -175,6 +181,8 @@ class EngineManager( IEngineManager ):
             self._server_thread.get_url(), "/loop/update" )
         liblo.send( self._engine_address, "/register_auto_update", "mappings",
             self._server_thread.get_url(), "/mapping/update" )
+        liblo.send( self._engine_address, "/register_auto_update", "shutdown",
+            self._server_thread.get_url(), "/shutdown" )
 
     def cleanup( self ):
         """
@@ -198,6 +206,9 @@ class EngineManager( IEngineManager ):
         self._pingack_lock.acquire()
         self._received_pingack = True
         self._pingack_lock.release()
+
+    def _shutdown_callback( self, path, args ):
+        self.notify( "shutdown", args )
 
     def _loop_change_callback( self, path, args ):
         logging.info( "loop change callback" )

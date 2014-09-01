@@ -112,8 +112,11 @@ class _MappingDialog( QDialog, Ui_MappingDialog ):
             self.spinBox_midi_value.value(),  str( self.comboBox_loop.currentText() ),
             str( self.comboBox_action.currentText() ) )
 
-class MainApplicationWrapper( object ):
+class MainApplicationWrapper( QtCore.QObject ):
+    engine_quit = QtCore.pyqtSignal()
+
     def __init__( self, *args, **kwargs ):
+        QtCore.QObject.__init__( self )
         import sys
         for key in kwargs:
             setattr( self, key, kwargs[key] )
@@ -144,11 +147,17 @@ class MainApplicationWrapper( object ):
         self._engine_manager = IEngineManagerFactory(
             parsed_args.engine_port, parsed_args.engine_host,
             parsed_args.gui_port, parsed_args.fail_on_engine_not_found, parsed_args.no_quit )
+        self._engine_manager.subscribe( "shutdown", self._quit )
 
         self._ui = _LooperWindow( self._engine_manager, self.package, self.version )
         self._engine_manager.initialize_subscribers()
 
         self._app.aboutToQuit.connect( self._cleanup )
+        self.engine_quit.connect( self._app.quit, type=QtCore.Qt.QueuedConnection )
+
+    def _quit( self ):
+        print( "Engine shutdown!" )
+        self.engine_quit.emit()
 
     def _cleanup( self ):
         self._engine_manager.cleanup()

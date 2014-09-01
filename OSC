@@ -73,7 +73,7 @@ REGISTER FOR CONTROL CHANGES
  /register_auto_update  s:ctrl s:returl s:retpath
  /unregister_auto_update  s:ctrl s:returl s:retpath
     
-    ctrl is one of 'loops' or 'mappings' or 'errors'
+    ctrl is one of 'loops', 'mappings', 'errors', 'shutdown'
 
 MIDI BINDING CONTROL
 
