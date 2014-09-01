@@ -147,7 +147,7 @@ int loop_new(
     // Loop ports.
     size_t length_of_name = strlen( name );
 
-    this->loop_output_name = malloc( length_of_name + 12 );
+    this->loop_output_name = malloc( length_of_name + 13 );
     if( sprintf( this->loop_output_name, "loop_%s_output", name ) < 0 ) {
         BAIL( "Error building output port name string for %s.\n", -20 );
     }
@@ -164,7 +164,7 @@ int loop_new(
         BAIL( "Could not register JACK output port for %s.\n", -30 );
     }
 
-    this->loop_input_name = malloc( length_of_name + 11 );
+    this->loop_input_name = malloc( length_of_name + 12 );
     if( sprintf( this->loop_input_name, "loop_%s_input", name ) < 0 ) {
         BAIL( "Error building input port name string for %s.\n", -40 );
     }

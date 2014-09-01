@@ -119,7 +119,10 @@ class MappingTableModel( QAbstractTableModel ):
     def data( self, index, role=QtCore.Qt.DisplayRole ):
         if role == QtCore.Qt.DisplayRole:
             if ( index.row() < len( self._data_model ) and index.column() < len( self.COLUMNS ) ):
-                return MappingTableModel.get_mapping_property( self._data_model[index.row()], index.column() )
+                property = MappingTableModel.get_mapping_property( self._data_model[index.row()], index.column() )
+                if index.column() == MappingTableModel.COLUMN_CHANNEL:
+                    property = property + 1
+                return property
             else:
                 return None
         else:

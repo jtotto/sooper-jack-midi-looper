@@ -51,13 +51,6 @@ ControlActionTable control_action_table_new( ChangeNotificationHandler handler )
     return new_table;
 }
 
-void control_action_table_free( ControlActionTable this )
-{
-    munlock( this->table, CONTROL_ACTION_TABLE_SIZE );
-    free( this->table );
-    free( this );
-}
-
 // These functions are particularly speed critical, so the duplication is worth it.
 static struct ControlActionListNode **midi_lookup_reference(
         ControlActionTable this,
@@ -103,16 +96,18 @@ void control_action_table_insert(
         LoopControlFunc control_func
     ) {
     
+    control_action_table_remove(
+        this, midi_channel, midi_type, midi_value, loop, control_func
+    );
+
     struct ControlActionListNode *new_action = malloc( sizeof( *new_action ) );
     new_action->loop = loop;
     new_action->action = control_func;
     
-    struct ControlActionListNode *action_list =
-        midi_lookup( this, midi_channel, midi_type, midi_value );
-    if( action_list ) {
-        new_action->next = action_list;
-    }
-    action_list = new_action;
+    struct ControlActionListNode **action_list =
+        midi_lookup_reference( this, midi_channel, midi_type, midi_value );
+    new_action->next = *action_list;
+    *action_list = new_action;
 
     this->table_change_handler(
         ACTION_ADD,
@@ -142,19 +137,19 @@ void control_action_table_remove(
             struct ControlActionListNode *temp = (*list)->next;
             free( *list );
             *list = temp;
+
+            this->table_change_handler(
+                ACTION_REMOVE,
+                midi_channel,
+                midi_type,
+                midi_value,
+                loop,
+                control_func
+            );
         } else {
             list = &( (*list)->next );   
         }
     }
-
-    this->table_change_handler(
-        ACTION_REMOVE,
-        midi_channel,
-        midi_type,
-        midi_value,
-        loop,
-        control_func
-    );
 }
 
 typedef int (*RemovalPredicate)( unsigned int, struct ControlActionListNode *, void *user_data );
@@ -171,6 +166,7 @@ static void conditional_mapping_removal(
                 unsigned char midi_channel, midi_value;
                 enum MidiControlType midi_type;
                 derive_midi_values( i, &midi_channel, &midi_type, &midi_value );
+
                 this->table_change_handler(
                     ACTION_REMOVE,
                     midi_channel,
@@ -262,3 +258,12 @@ void control_action_table_foreach_mapping(
         }
     }
 }
+
+void control_action_table_free( ControlActionTable this )
+{
+    control_action_table_clear_mappings( this );
+    munlock( this->table, CONTROL_ACTION_TABLE_SIZE );
+    free( this->table );
+    free( this );
+}
+

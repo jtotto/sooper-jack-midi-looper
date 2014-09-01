@@ -23,6 +23,9 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
 
         self.mappingTableViewModel = MappingTableModel()
         self.mappingTableView.setModel( self.mappingTableViewModel )
+        # PyUIC doesn't generate code for word wrap :(
+        self.mappingTableView.setWordWrap( True )
+        self.mappingTableView.resizeRowsToContents()
         tableHeader = self.mappingTableView.horizontalHeader()
         tableHeader.setSectionResizeMode( QtWidgets.QHeaderView.Stretch )
 
@@ -33,6 +36,8 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
             self._mapping_update_handler, type=QtCore.Qt.QueuedConnection )
         self._engine_manager.subscribe( "loops", self.signal_loop_update )
         self._engine_manager.subscribe( "mappings", self.signal_mapping_update )
+
+        QtCore.QTimer.singleShot( 0, self.mappingTableView.resizeRowsToContents )
 
     def signal_loop_update( self, change, data ):
         self.loopUpdated.emit( change, data )
@@ -53,6 +58,7 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
         if change == "add":
             self.mappingTableViewModel.insertMappingRow(
                 self.mappingTableViewModel.rowCount(), data )
+            self.mappingTableView.resizeRowsToContents() # HACK
         elif change == "remove":
             self.mappingTableViewModel.removeMapping( data )
         else:
@@ -89,7 +95,7 @@ class _LooperWindow( QMainWindow, Ui_MainWindow ):
                 MIDIMappingInfo( channel, midi_type, value, name, action ) )
 
     def removeMappings( self ):
-        mappings = [self.mappingTableViewModel.dataRow( x )
+        mappings = [self.mappingTableViewModel.dataRow( x.row() )
             for x in self.mappingTableView.selectionModel().selectedRows()]
         self._engine_manager.remove_mappings( mappings )
 

@@ -731,6 +731,7 @@ int loop_del_handler(
 
     Loop to_be_removed = g_hash_table_lookup( loop_table, name );
     if( to_be_removed ) {
+        control_action_table_remove_loop_mappings( action_table, to_be_removed );
         g_hash_table_remove( loop_table, name );
         auto_update( "loops", "remove", name );
 
@@ -987,8 +988,6 @@ int remove_mapping_handler(
         loop,
         control_func
     );
-
-    auto_update( "mappings", "remove", serialization );
 
     pthread_mutex_unlock( &action_table_lock );
     pthread_mutex_unlock( &loop_table_lock );

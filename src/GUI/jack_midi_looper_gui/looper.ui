@@ -6,13 +6,13 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>523</width>
+    <width>530</width>
     <height>420</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>523</width>
+    <width>530</width>
     <height>420</height>
    </size>
   </property>
@@ -25,12 +25,12 @@
      <rect>
       <x>0</x>
       <y>10</y>
-      <width>521</width>
+      <width>531</width>
       <height>381</height>
      </rect>
     </property>
     <property name="currentIndex">
-     <number>1</number>
+     <number>0</number>
     </property>
     <widget class="QWidget" name="loopTab">
      <attribute name="title">
@@ -41,7 +41,7 @@
        <rect>
         <x>10</x>
         <y>10</y>
-        <width>501</width>
+        <width>511</width>
         <height>291</height>
        </rect>
       </property>
@@ -56,7 +56,7 @@
         <rect>
          <x>10</x>
          <y>10</y>
-         <width>481</width>
+         <width>491</width>
          <height>271</height>
         </rect>
        </property>
@@ -65,7 +65,7 @@
      <widget class="QToolButton" name="addLoopButton">
       <property name="geometry">
        <rect>
-        <x>470</x>
+        <x>480</x>
         <y>310</y>
         <width>23</width>
         <height>25</height>
@@ -85,7 +85,7 @@
      <widget class="QToolButton" name="removeLoopButton">
       <property name="geometry">
        <rect>
-        <x>490</x>
+        <x>500</x>
         <y>310</y>
         <width>23</width>
         <height>25</height>
@@ -112,7 +112,7 @@
        <rect>
         <x>10</x>
         <y>10</y>
-        <width>501</width>
+        <width>511</width>
         <height>291</height>
        </rect>
       </property>
@@ -127,16 +127,28 @@
         <rect>
          <x>10</x>
          <y>10</y>
-         <width>481</width>
+         <width>491</width>
          <height>271</height>
         </rect>
        </property>
+       <property name="selectionBehavior">
+        <enum>QAbstractItemView::SelectRows</enum>
+       </property>
+       <property name="textElideMode">
+        <enum>Qt::ElideNone</enum>
+       </property>
+       <property name="cornerButtonEnabled">
+        <bool>false</bool>
+       </property>
+       <attribute name="verticalHeaderVisible">
+        <bool>false</bool>
+       </attribute>
       </widget>
      </widget>
      <widget class="QToolButton" name="addMappingButton">
       <property name="geometry">
        <rect>
-        <x>470</x>
+        <x>480</x>
         <y>310</y>
         <width>23</width>
         <height>25</height>
@@ -156,7 +168,7 @@
      <widget class="QToolButton" name="removeMappingButton">
       <property name="geometry">
        <rect>
-        <x>490</x>
+        <x>500</x>
         <y>310</y>
         <width>23</width>
         <height>25</height>
@@ -181,7 +193,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>523</width>
+     <width>530</width>
      <height>25</height>
     </rect>
    </property>
