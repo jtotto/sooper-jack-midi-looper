@@ -1,4 +1,4 @@
---- IN PROGRESS - looping engine finished, UI under construction ---
+(demo coming soon!)
 
 I really love the creative possibilities that loopers offer.  Apparently a
 lot of other people do too, because there are a ton of great open-source 
@@ -19,10 +19,11 @@ footprint for its buffers, so in computing environments where processing time
 is relatively abundant in comparison to memory, it may enable looping where it
 would otherwise be impossible.
 
+Hey, YOU!  If you're still reading this, there's a good chance you're at least
+moderately interested in using this thing.  Let me know! (jtotto@uwaterloo.ca)
+There are a whole pile of additional features needed to actually make this thing
+useful (probably the most significant of which is tempo quantization).  If you
+exist, I would be happy to jump right on it.
+
 --- Building ---
-This project depends on JACK for MIDI, GTK for UI and Glib for some data structures.
-
-You can build it with 
-gcc -Wall -o bin/looper looper.c midi_message.c loop.c loop_buffer.c  $(pkg-config --cflags --libs jack gtk+-3.0 glib-2.0) -std=c99
-
-I'll write a makefile if it gets significantly more complicated.
+The project now has an autotools build!  ./configure && make && make install
