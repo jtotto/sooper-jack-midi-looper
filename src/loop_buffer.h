@@ -32,7 +32,7 @@ void loop_buffer_reset_write( LoopBuffer buffer );
 void loop_buffer_free( LoopBuffer buffer ); // Can safely be called with a loop buffer in any state (checks for NULL input).
 
 int loop_buffer_push( LoopBuffer buffer, struct MidiMessage *message );
-struct MidiMessage *loop_buffer_peek( LoopBuffer buffer, int *wrapped );
-void loop_buffer_read_advance( LoopBuffer buffer );
+struct MidiMessage *loop_buffer_peek( LoopBuffer buffer );
+int loop_buffer_read_advance( LoopBuffer buffer );
 
 #endif

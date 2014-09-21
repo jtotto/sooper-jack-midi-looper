@@ -23,18 +23,27 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
 
+#include "debug.h"
 #include "loop_buffer.h"
 #include "midi_message.h"
 
 // Are these reasonable?
-#define MIDI_IO_BUFFER_SIZE     1024*sizeof( struct MidiMessage )
-#define MIDI_LOOP_BUFFER_SIZE   2048*sizeof( struct MidiMessage )
+#define MIDI_IO_BUFFER_SIZE     (1024*sizeof( struct MidiMessage ))
+#define MIDI_LOOP_BUFFER_SIZE    2048
 
 typedef enum {
-    STATE_RECORDING,
-    STATE_PLAYBACK,
-    STATE_IDLE
+    STATE_RECORDING = 0,
+    STATE_PLAYBACK = 1,
+    STATE_IDLE = 2
 } LoopState;
+
+#ifdef DEBUGGING_OUTPUT
+static const char *STATE_STRINGS[3] = {
+    "STATE_RECORDING",
+    "STATE_PLAYBACK",
+    "STATE_IDLE"
+};
+#endif
 
 struct StateSchedule {
     LoopState state;
@@ -258,6 +267,7 @@ int loop_get_playback_after_recording( Loop this )
 
 void loop_toggle_playback( Loop this, jack_nframes_t time )
 {
+    DEBUGGING_MESSAGE( "loop_toggle_playback %s", loop_get_name( this ) );
     if( this->current_state.state == STATE_PLAYBACK ) {
         schedule_state_change( this, STATE_IDLE, time );
     } else {
@@ -267,6 +277,7 @@ void loop_toggle_playback( Loop this, jack_nframes_t time )
 
 void loop_toggle_recording( Loop this, jack_nframes_t time )
 {
+    DEBUGGING_MESSAGE( "loop_toggle_recording %s", loop_get_name( this ) );
     if( this->current_state.state == STATE_RECORDING ) {
         schedule_state_change( this, STATE_PLAYBACK, time );
     } else {
@@ -316,6 +327,7 @@ int loop_process_callback( Loop this, jack_nframes_t nframes )
 
     int read_next_state;
     do {
+        //DEBUGGING_MESSAGE( "%s: state %s\n", loop_get_name( this ), STATE_STRINGS[this->current_state.state] );
         struct StateSchedule next;
         read_next_state = jack_ringbuffer_read( this->state_buffer, (char *) &next, sizeof( next ) );
         if( read_next_state == 0 ) {
@@ -357,6 +369,7 @@ int loop_process_callback( Loop this, jack_nframes_t nframes )
                 {
                     if( previous_state.state != STATE_RECORDING ) {
                         this->recording_start = this->current_state.time + last_frame_time;
+                        loop_buffer_reset_write( this->midi_loop_buffer );
                     }
                 }
                 break;
@@ -369,9 +382,13 @@ int loop_process_callback( Loop this, jack_nframes_t nframes )
         // Transition states.
         if( next.state == STATE_PLAYBACK && this->current_state.state != STATE_PLAYBACK ) {
             loop_buffer_reset_read( this->midi_loop_buffer );
-        } else if( this->current_state.state == STATE_RECORDING && next.state != STATE_RECORDING ) {
+        }
+        
+        if( this->current_state.state == STATE_RECORDING && next.state != STATE_RECORDING ) {
             this->recording_end = next.time + last_frame_time;
             this->recording_length = this->recording_end - this->recording_start;
+            DEBUGGING_MESSAGE( "end recording end start %d %d\n",
+            this->recording_end, this->recording_start );
         }
 
         previous_state = this->current_state;
@@ -411,6 +428,7 @@ static int process_state_midi_input(
         }
 
         if( this->midi_through ) {
+            // DEBUGGING_MESSAGE( "queuing midi through\n" );
             int queue_result = queue_midi_message( this->midi_io_buffer, &input_message );
 
             if( queue_result != 0 ) {
@@ -444,20 +462,28 @@ static int process_state_midi_playback(
 
     /* Only returns NULL if the loop is invalid to begin with.
      * Peek is constant time, so the readability gain seems worth it. */
-    while( ( recorded = loop_buffer_peek( this->midi_loop_buffer, &wrapped ) ) ) {
-
-        if( wrapped ) {
-            this->last_playback_start += this->recording_length;
-        }
+    while( ( recorded = loop_buffer_peek( this->midi_loop_buffer ) ) ) {
 
         jack_nframes_t playback_time = recorded->time + this->last_playback_start;
+
+        /* DEBUGGING_MESSAGE(
+            "recorded playback %d %d %d %d %d\n",
+            recorded->time,
+            this->last_playback_start,
+            playback_time,
+            end_of_state,
+            last_frame_time
+        ); */
 
         if( playback_time < end_of_state + last_frame_time ) {
             struct MidiMessage adjusted = *recorded;
             adjusted.time = playback_time - last_frame_time;
 
             queue_midi_message( this->midi_io_buffer, &adjusted );
-            loop_buffer_read_advance( this->midi_loop_buffer );
+            wrapped = loop_buffer_read_advance( this->midi_loop_buffer );
+            if( wrapped ) {
+                this->last_playback_start += this->recording_length;
+            }
         } else {
             break; // The loop will almost certainly exit this way.
         }

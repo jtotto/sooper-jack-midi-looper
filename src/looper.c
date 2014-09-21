@@ -40,16 +40,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA. 
 #include "midi_message.h"
 #include "loop.h"
 #include "control_action_table.h"
+#include "debug.h"
 
 #define NOTE_OFF 0x80
 #define NOTE_ON 0x90
 #define CONTROL_CHANGE 0xB0
-
-#ifdef DEBUGGING_OUTPUT
-#define DEBUGGING_MESSAGE( format_data... ) fprintf( stderr, format_data )
-#else
-#define DEBUGGING_MESSAGE( format_data... ) 
-#endif
 
 /* ----------------------------------------------------   
    Plumbing
@@ -149,6 +144,7 @@ void process_control_input( jack_nframes_t nframes )
                         break;
                 }
 
+                DEBUGGING_MESSAGE( "control %u %d %u\n", midi_channel, midi_type, midi_value );
                 control_action_table_invoke(
                     action_table,
                     midi_channel,

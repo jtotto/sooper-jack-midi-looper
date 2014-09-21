@@ -23,9 +23,9 @@
 
 struct loop_buffer_type {
     struct MidiMessage *buffer;
+    struct MidiMessage *buffer_end;
     struct MidiMessage *read_pointer;
     struct MidiMessage *write_pointer;
-    struct MidiMessage *end_pointer;
 };
 
 struct loop_buffer_type *loop_buffer_init( size_t capacity ) 
@@ -48,7 +48,7 @@ struct loop_buffer_type *loop_buffer_init( size_t capacity )
     }
 
     loop_buffer_reset_write( buffer_struct );
-    buffer_struct->end_pointer = buffer_struct->buffer + capacity;
+    buffer_struct->buffer_end = buffer_struct->buffer + capacity;
 
     return buffer_struct;
 }
@@ -85,7 +85,7 @@ void loop_buffer_free( struct loop_buffer_type *loop_buffer )
 int loop_buffer_push( struct loop_buffer_type *loop_buffer, struct MidiMessage *message )
 {
 
-    if( loop_buffer->write_pointer == loop_buffer->end_pointer ) {
+    if( loop_buffer->write_pointer == loop_buffer->buffer_end ) {
         return -10;
     }
 
@@ -99,23 +99,22 @@ int loop_buffer_push( struct loop_buffer_type *loop_buffer, struct MidiMessage *
     return 0;
 }
 
-struct MidiMessage *loop_buffer_peek( struct loop_buffer_type *loop_buffer, int *wrapped )
+struct MidiMessage *loop_buffer_peek( struct loop_buffer_type *loop_buffer )
 {
-
-    if( loop_buffer->read_pointer == loop_buffer->end_pointer ) {
-        loop_buffer->read_pointer = loop_buffer->buffer;
-        *wrapped = 1;
-    } else {
-        *wrapped = 0;
-    }
-
     return loop_buffer->read_pointer;
 }
 
-void loop_buffer_read_advance( struct loop_buffer_type *loop_buffer )
+int loop_buffer_read_advance( struct loop_buffer_type *loop_buffer )
 {
     if( loop_buffer->read_pointer != NULL ) {
         loop_buffer->read_pointer++;
+        if( loop_buffer->read_pointer < loop_buffer->write_pointer ) {
+            return 0;
+        } else {
+            loop_buffer->read_pointer = loop_buffer->buffer;
+        }
     }
+    
+    return 1;
 }
 
