@@ -111,8 +111,9 @@ void process_control_input( jack_nframes_t nframes )
 
     events = jack_midi_get_event_count( control_port_buffer );
 
+    int got_loop_table_lock = !pthread_mutex_trylock( &loop_table_lock );
     if(
-        pthread_mutex_trylock( &loop_table_lock ) == 0
+        got_loop_table_lock
         && pthread_mutex_trylock( &action_table_lock ) == 0
     ) {
         int i;
@@ -159,6 +160,10 @@ void process_control_input( jack_nframes_t nframes )
         pthread_mutex_unlock( &loop_table_lock );
         pthread_mutex_unlock( &action_table_lock );
     } else {
+        if( got_loop_table_lock ) {
+            pthread_mutex_unlock( &loop_table_lock );
+        }
+
         DEBUGGING_MESSAGE( "Tables locked, no output.\n" );
     }
 
